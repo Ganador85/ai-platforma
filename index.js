@@ -18,7 +18,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const port = process.env.PORT || 10000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // --- MULTER KONFIGŪRACIJA ---
