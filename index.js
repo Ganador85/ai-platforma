@@ -679,7 +679,7 @@ async function generateAndSaveTitle(conversationId, userMessage, aiMessage) {
     }
     return null;
 }
-
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Serveris veikia adresu: http://localhost:${port}`);
 });
