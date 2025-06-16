@@ -1,0 +1,23 @@
+# Priklausomybės (būtina ignoruoti!)
+/node_modules
+
+# Vartotojo įkelti failai
+/uploads
+
+# Aplinkos kintamieji (labai svarbu saugumui!)
+.env
+
+# Gamybos aplankai (jei naudotumėte)
+/build
+/dist
+
+# Diagnostikos ir klaidų log'ai
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS specifiniai failai
+.DS_Store
+Thumbs.db
