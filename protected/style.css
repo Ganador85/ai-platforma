@@ -31,15 +31,15 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  padding-top: env(safe-area-inset-top); /* Saugus plotas viršuje */
-  padding-bottom: env(safe-area-inset-bottom); /* Saugus plotas apačioje */
+  padding-top: env(safe-area-inset-top, 20px); /* Saugus plotas viršuje su atsarginiu 20px */
+  padding-bottom: env(safe-area-inset-bottom, 60px); /* Saugus plotas apačioje su atsarginiu 60px */
   overflow-x: hidden;
 }
 
 .app-shell {
   width: 95%;
   max-width: 1000px;
-  height: 85vh;
+  height: calc(85vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 60px)); /* Dinamiškas aukštis */
   max-height: 800px;
   background-color: var(--shell-bg);
   border-radius: 12px;
@@ -47,8 +47,8 @@ body {
   display: flex;
   overflow: hidden;
   position: relative;
-  margin-top: env(safe-area-inset-top);
-  margin-bottom: env(safe-area-inset-bottom);
+  margin-top: env(safe-area-inset-top, 20px);
+  margin-bottom: env(safe-area-inset-bottom, 60px);
 }
 
 #menu-toggle-btn {
@@ -56,11 +56,12 @@ body {
   position: absolute;
   top: 15px;
   left: 15px;
-  z-index: 1002; /* Aukštesnis z-index, kad neuždengtų kitų elementų */
+  z-index: 1002; /* Aukštesnis z-index */
   background: transparent;
   padding: 8px;
   border: none;
   cursor: pointer;
+  margin-left: 10px; /* Papildoma erdvė kairėje */
 }
 
 #menu-toggle-btn:hover {
@@ -104,9 +105,9 @@ body.sidebar-visible #history-sidebar {
 @media (max-width: 768px) {
   #history-sidebar {
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top, 20px); /* Pradedamas nuo saugaus ploto */
     left: 0;
-    height: 100vh;
+    height: calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 60px));
     transform: translateX(calc(-1 * var(--sidebar-width)));
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
   }
@@ -579,7 +580,7 @@ button:active {
 @media (max-width: 768px) {
   .app-shell {
     width: 100%;
-    height: 100vh;
+    height: calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 60px));
     max-height: none;
     border-radius: 0;
     margin: 0;
@@ -588,30 +589,30 @@ button:active {
 
   #menu-toggle-btn {
     display: flex;
-    margin-left: 10px; /* Vieta naujam susirašinėjimui */
+    margin-left: 15px; /* Daugiau vietos "Naujas pokalbis" mygtukui */
   }
 
   #history-sidebar {
-    margin-top: env(safe-area-inset-top);
+    margin-top: env(safe-area-inset-top, 20px);
   }
 
   #chat-container {
     padding: 15px;
     width: 100%;
-    padding-bottom: 60px; /* Vieta klaviatūrai */
+    padding-bottom: 80px; /* Daugiau vietos klaviatūrai */
   }
 
   h1 {
     font-size: 1.2rem;
-    padding-left: 50px; /* Vieta meniu mygtukui */
+    padding-left: 60px; /* Dar daugiau vietos meniu mygtukui */
     text-align: left;
+  }
+
+  #chat-form {
+    padding: 10px 0 20px 0;
   }
 
   #user-input {
     padding: 8px;
-  }
-
-  #chat-form {
-    padding: 10px 0 15px 0;
   }
 }
