@@ -269,7 +269,8 @@ body.sidebar-visible #history-sidebar {
 
 #chat-container {
   flex-grow: 1;
-  height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Aukštis atsižvelgiant į "Naujas pokalbis" */
+  height: auto; /* Dinamiškas aukštis */
+  min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Minimalus aukštis */
   display: flex;
   flex-direction: column;
   padding: 60px 30px 0 30px; /* Vieta "Naujas pokalbis" */
@@ -332,6 +333,7 @@ h1 {
   display: flex;
   flex-direction: column-reverse; /* Naujienos apačioje */
   gap: 10px;
+  height: 100%; /* Užpildo visą turimą erdvę */
 }
 
 #chat-box::-webkit-scrollbar {
@@ -415,13 +417,14 @@ h1 {
   flex-shrink: 0;
   padding: 10px 0;
   position: fixed;
-  bottom: env(safe-area-inset-bottom, 10px);
+  bottom: 0; /* Pradedama nuo apačios */
   width: 100%;
   background-color: var(--shell-bg);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
   padding-left: 15px;
   padding-right: 15px;
   z-index: 1000;
+  transform: translateY(calc(env(safe-area-inset-bottom, 0px))); /* Prisitaikymas prie klaviatūros */
 }
 
 .input-area {
@@ -620,7 +623,8 @@ button:active {
 
   #chat-container {
     padding: 60px 15px 0 15px;
-    height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Aukštis atsižvelgiant į "Naujas pokalbis" ir formą */
+    height: auto; /* Dinamiškas aukštis */
+    min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px - 60px); /* Atimama forma ir "Naujas pokalbis" */
     margin-left: 0; /* Nėra šoninės juostos poveikio */
   }
 
@@ -641,5 +645,7 @@ button:active {
 
   #chat-form {
     padding: 10px 0;
+    bottom: 0;
+    transform: translateY(calc(env(safe-area-inset-bottom, 0px))); /* Dinamiškas prisitaikymas */
   }
 }
