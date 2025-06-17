@@ -14,13 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuToggleBtn = document.getElementById('menu-toggle-btn');
     const overlay = document.getElementById('overlay');
     const logoutBtn = document.getElementById("logout-btn");
-    const mainHeader = document.querySelector('.main-header'); // PAKEITIMAS: Pasiimame naują antraštės elementą
+    const mainHeader = document.querySelector('.main-header');
 
     // --- BŪSENOS KINTAMIEJI ---
     let conversationId = null;
     let isLoading = false;
     let stagedFiles = [];
-    let lastScrollTop = 0; // PAKEITIMAS: Slenkančios antraštės būsenai
+    let lastScrollTop = 0;
 
     // --- ĮVYKIŲ KLAUSYTOJAI ---
 	if (logoutBtn) {
@@ -44,6 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
     uploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
 
+    // PAKEITIMAS: Pridėtas klausytojas, kuris paspaudus ant įvesties laukelio prascrollina pokalbius į apačią.
+    // Tai pagerina vartotojo patirtį atsidarius klaviatūrai.
+    input.addEventListener('focus', () => {
+        setTimeout(() => {
+            messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+        }, 300); // Mažas uždelsimas, kad vartotojo sąsaja spėtų prisitaikyti prie klaviatūros
+    });
+
     if (searchForm) {
         searchForm.addEventListener('submit', handleSearchSubmit);
     }
@@ -64,12 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // PAKEITIMAS: Pridedamas įvykio klausytojas pokalbių lango slinkimui
     if (messagesContainer && mainHeader) {
         messagesContainer.addEventListener("scroll", () => {
             const scrollTop = messagesContainer.scrollTop;
-            // Slepiam antraštę, jei slenkama žemyn ir nuvažiuota pakankamai nuo viršaus
-            // Rodom, jei slenkama į viršų
             if (scrollTop > lastScrollTop && scrollTop > 50) {
                 mainHeader.classList.add("header-hidden");
             } else if (scrollTop < lastScrollTop) {
@@ -79,12 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
     // --- PRADINIS PALEIDIMAS ---
     initializeApp();
 
     // --- FUNKCIJŲ APRAŠYMAI ---
-
     async function initializeApp() {
         const conversations = await fetchAndRenderHistory();
         if (conversations && conversations.length > 0) {
@@ -176,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hideSearchResults() {
         searchResultsContainer.style.display = 'none';
-        messagesContainer.style.display = 'flex'; // Pakeista atgal į flex
+        messagesContainer.style.display = 'flex';
         document.getElementById('chat-form').style.display = 'flex';
         searchInput.value = '';
     }
