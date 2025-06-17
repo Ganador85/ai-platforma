@@ -290,6 +290,7 @@ h1 {
   white-space: pre-wrap;
   line-height: 1.5;
   word-wrap: break-word; /* Pridėta, kad ilgas tekstas be tarpų būtų perkeltas */
+  font-size: 0.95rem; /* PAMAŽINTAS ŠRIFTAS */
 }
 
 .user-message {
@@ -418,7 +419,7 @@ button:active {
   border: 1px solid var(--border-color);
   background-color: #2b2b2b;
   color: white;
-  font-size: 1rem; /* Pakeista į 1rem (16px) */
+  font-size: 0.95rem; /* PAMAŽINTAS ŠRIFTAS */
   font-family: 'Inter', sans-serif;
   transition: all 0.2s ease-in-out;
   resize: none;
@@ -521,6 +522,11 @@ button:active {
     height: 100%;
     border-right: 1px solid var(--border-color);
     box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  /* PATAISYMAS: Pridėtas tarpas šoninio meniu viršuje, kad neuždengtų meniu mygtuko */
+  .sidebar-header {
+    padding-top: 60px;
   }
 
   body.sidebar-visible #history-sidebar {
