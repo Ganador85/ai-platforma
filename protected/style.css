@@ -26,78 +26,66 @@ body {
   color: var(--text-color);
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Pakeista iš center, kad tilptų visas turinys */
-  min-height: 100vh;
-  padding-top: env(safe-area-inset-top, 10px);
-  padding-bottom: env(safe-area-inset-bottom, 10px); /* Pridėta klaviatūros prisitaikymas */
+  align-items: center;
+  height: 100vh;
   overflow-x: hidden;
 }
 
 .app-shell {
   width: 95%;
   max-width: 1000px;
-  height: auto; /* Pakeista iš 85vh, kad tilptų dinamiškai */
-  min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px)); /* Dinamiškas aukštis */
+  height: 85vh;
+  max-height: 800px;
   background-color: var(--shell-bg);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex;
   overflow: hidden;
   position: relative;
-  margin-top: env(safe-area-inset-top, 10px);
-  margin-bottom: env(safe-area-inset-bottom, 10px);
 }
 
 #menu-toggle-btn {
-  display: none;
-  position: absolute;
-  top: 22px;
-  left: 15px;
-  z-index: 1001;
-  background: transparent;
-  padding: 5px;
-  border: none;
-  cursor: pointer;
+    display: none;
+    position: absolute;
+    top: 22px;
+    left: 15px;
+    z-index: 1001;
+    background: transparent;
+    padding: 5px;
+    border: none;
 }
 
 #menu-toggle-btn:hover {
-  background-color: var(--hover-bg);
-  transform: none;
+    background-color: var(--hover-bg);
+    transform: none;
 }
 
 #overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
-  z-index: 998;
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 998;
 }
 
 body.sidebar-visible #overlay {
-  display: block;
+    display: block;
 }
 
 #history-sidebar {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
-  height: 100%; /* Užtikrina, kad užimtų visą aukštį */
+  height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: space-between; /* <-- PRIDĖTAS PAKEITIMAS */
   border-right: 1px solid var(--border-color);
   flex-shrink: 0;
   transition: all 0.3s ease-in-out;
   z-index: 999;
-  position: fixed;
-  top: 0;
-  left: calc(-1 * var(--sidebar-width) - 2px); /* Pridėtas slėpimo mechanizmas */
-}
-
-body.sidebar-visible #history-sidebar {
-  left: 0;
 }
 
 .sidebar-header {
@@ -162,14 +150,14 @@ body.sidebar-visible #history-sidebar {
 }
 
 #search-form svg {
-  width: 18px;
-  height: 18px;
+    width: 18px;
+    height: 18px;
 }
 
 .sidebar-main-content {
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
 }
 
 #history-list {
@@ -178,8 +166,7 @@ body.sidebar-visible #history-sidebar {
   padding: 10px 0;
 }
 
-#history-list ul,
-#history-list li {
+#history-list ul, #history-list li {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -259,16 +246,15 @@ body.sidebar-visible #history-sidebar {
 
 #chat-container {
   flex-grow: 1;
-  height: 100%; /* Užtikrina, kad užimtų visą turimą erdvę */
+  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px 30px 0 30px;
+  padding: 25px 30px 0 30px; 
   transition: background-color 0.2s;
-  overflow-y: auto; /* Pridėta slinktis, jei turinys ilgas */
 }
 
 #chat-container.drag-over {
-  background-color: var(--hover-bg);
+    background-color: var(--hover-bg);
 }
 
 h1 {
@@ -294,23 +280,14 @@ h1 {
   border: none;
   background-color: transparent;
   display: flex;
-  flex-direction: column-reverse; /* Naujienos apačioje */
+  flex-direction: column;
   gap: 10px;
 }
 
-#chat-box::-webkit-scrollbar {
-  width: 8px;
-}
-#chat-box::-webkit-scrollbar-track {
-  background: transparent;
-}
-#chat-box::-webkit-scrollbar-thumb {
-  background-color: #333;
-  border-radius: 4px;
-}
-#chat-box::-webkit-scrollbar-thumb:hover {
-  background-color: #555;
-}
+#chat-box::-webkit-scrollbar { width: 8px; }
+#chat-box::-webkit-scrollbar-track { background: transparent; }
+#chat-box::-webkit-scrollbar-thumb { background-color: #333; border-radius: 4px; }
+#chat-box::-webkit-scrollbar-thumb:hover { background-color: #555; }
 
 .user-message,
 .ai-message {
@@ -323,8 +300,8 @@ h1 {
 }
 
 .user-message {
-  align-self: flex-end;
-  background: #37373f;
+  align-self: flex-end; /* <-- PATIKRINTA: Išlygiuoja dešinėje */
+  background: #37373f;  /* <-- PAKEISTA: Neutralesnė spalva */
   color: white;
   border-bottom-right-radius: 4px;
 }
@@ -351,18 +328,9 @@ h1 {
   transition: all 0.2s ease-in-out;
 }
 
-.ai-message:hover .copy-btn {
-  opacity: 1;
-}
-
-.copy-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.copy-btn svg {
-  width: 16px;
-  height: 16px;
-}
+.ai-message:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { background-color: rgba(255, 255, 255, 0.2); }
+.copy-btn svg { width: 16px; height: 16px; }
 
 .error-message {
   background-color: var(--error-bg);
@@ -374,15 +342,8 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 10px 0; /* Sumažintas padding */
-  position: fixed; /* Fiksuota apačioje */
-  bottom: env(safe-area-inset-bottom, 10px); /* Prisitaikymas prie klaviatūros */
-  width: 100%;
-  background-color: var(--shell-bg);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-  padding-left: 15px;
-  padding-right: 15px;
-  z-index: 1000;
+  padding-top: 20px;
+  padding-bottom: 25px;
 }
 
 .input-area {
@@ -450,11 +411,8 @@ button {
   transition: all 0.2s ease-in-out;
 }
 
-button:hover {
-  transform: translateY(-2px);
-}
-
-button:active {
+button:hover { transform: translateY(-2px); }
+button:active { 
   transform: translateY(0) scale(0.97);
   transition-duration: 0.05s;
 }
@@ -480,9 +438,9 @@ button:active {
 }
 
 .input-area button {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
 }
 
 .input-area button[type="submit"] {
@@ -490,9 +448,7 @@ button:active {
   color: white;
 }
 
-.input-area button[type="submit"]:hover {
-  background-color: #005fa3;
-}
+.input-area button[type="submit"]:hover { background-color: #005fa3; }
 
 .secondary-btn {
   padding: 10px 16px;
@@ -505,9 +461,7 @@ button:active {
   justify-content: flex-start;
 }
 
-.secondary-btn:hover {
-  background-color: var(--hover-bg);
-}
+.secondary-btn:hover { background-color: var(--hover-bg); }
 
 .logout-btn:hover {
   background-color: var(--logout-hover-bg);
@@ -516,10 +470,10 @@ button:active {
 }
 
 .input-area .secondary-btn {
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    justify-content: center;
 }
 
 .history-item-edit-input {
@@ -533,30 +487,13 @@ button:active {
   font-size: 0.9rem;
 }
 
-.message-enter {
-  animation: slideIn 0.4s ease-out;
-}
-
+.message-enter { animation: slideIn 0.4s ease-out; }
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-.indicator-container {
-  background-color: transparent;
-  padding: 10px 18px;
-}
-
-.indicator-container img {
-  width: 50px;
-  height: auto;
-}
+.indicator-container { background-color: transparent; padding: 10px 18px; }
+.indicator-container img { width: 50px; height: auto; }
 
 @keyframes textShine {
   to {
@@ -565,28 +502,25 @@ button:active {
 }
 
 .sidebar-footer {
-  padding: 15px;
-  border-top: 1px solid var(--border-color);
+    padding: 15px;
+    border-top: 1px solid var(--border-color);
 }
 
-/* Mobilieji įrenginiai */
 @media (max-width: 768px) {
   .app-shell {
     width: 100%;
-    height: auto;
-    min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px)); /* Dinamiškas aukštis */
+    height: 100vh;
+    max-height: none;
     border-radius: 0;
-    margin: 0;
-    padding: 0;
   }
 
   #history-sidebar {
     position: fixed;
-    left: calc(-1 * var(--sidebar-width) - 2px);
-    top: env(safe-area-inset-top, 0px); /* Prasideda nuo saugaus ploto */
-    height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    left: calc(-1 * var(--sidebar-width) - 10px);
+    top: 0;
+    height: 100%;
     border-right: 1px solid var(--border-color);
-    box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 4px 0px 15px rgba(0,0,0,0.2);
   }
 
   body.sidebar-visible #history-sidebar {
@@ -596,24 +530,16 @@ button:active {
   #chat-container {
     padding: 15px;
     width: 100%;
-    height: auto; /* Dinamiškas aukštis */
-    min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Atimama forma */
   }
-
+  
   #chat-form {
     padding: 10px 0 15px 0;
-    bottom: env(safe-area-inset-bottom, 10px);
   }
 
   h1 {
     font-size: 1.2rem;
     padding-left: 40px;
     text-align: left;
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    transform: translateX(0);
-    width: auto;
   }
 
   #menu-toggle-btn {
