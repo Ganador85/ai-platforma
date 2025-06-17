@@ -29,9 +29,9 @@ body {
   color: var(--text-color);
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Pakeista iš center, kad būtų prie viršaus */
+  align-items: flex-start;
   min-height: 100vh;
-  padding-top: env(safe-area-inset-top, 10px); /* Minimalus saugus plotas */
+  padding-top: env(safe-area-inset-top, 10px);
   padding-bottom: env(safe-area-inset-bottom, 10px);
   overflow-x: hidden;
 }
@@ -39,8 +39,8 @@ body {
 .app-shell {
   width: 95%;
   max-width: 1000px;
-  height: auto; /* Dinamiškas aukštis pagal turinį */
-  min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px)); /* Minimalus aukštis */
+  height: auto;
+  min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px));
   background-color: var(--shell-bg);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -61,7 +61,6 @@ body {
   padding: 8px;
   border: none;
   cursor: pointer;
-  margin-left: 0; /* Nustatoma vėliau */
 }
 
 #menu-toggle-btn:hover {
@@ -87,42 +86,33 @@ body.sidebar-visible #overlay {
 #history-sidebar {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
-  height: 100%; /* Užpildo visą aukštį */
+  height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px));
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Elementai iš pradžių */
+  justify-content: flex-start;
   border-right: 1px solid var(--border-color);
   flex-shrink: 0;
   transition: transform 0.3s ease-in-out;
   z-index: 1000;
-  position: absolute;
-  top: 0;
+  position: fixed;
+  top: env(safe-area-inset-top, 10px);
   left: 0;
-  transform: translateX(calc(-1 * var(--sidebar-width))); /* Slėpta iš pradžių */
+  transform: translateX(calc(-1 * var(--sidebar-width)));
 }
 
 body.sidebar-visible #history-sidebar {
-  transform: translateX(0); /* Atidaroma */
+  transform: translateX(0);
 }
 
 @media (max-width: 768px) {
   #history-sidebar {
-    position: fixed;
-    top: 60px; /* Pradedama žemiau "Naujas pokalbis" */
-    left: 0;
-    height: calc(100vh - 60px - env(safe-area-inset-bottom, 10px)); /* Aukštis pagal likusią erdvę */
-    transform: translateX(calc(-1 * var(--sidebar-width)));
-    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
-  }
-
-  body.sidebar-visible #history-sidebar {
-    transform: translateX(0);
+    top: env(safe-area-inset-top, 10px); /* Prasideda nuo saugaus ploto */
+    height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px));
   }
 
   #menu-toggle-btn {
     display: flex;
-    margin-left: 15px; /* Vieta šalia "Naujas pokalbis" */
-    top: 15px;
+    margin-left: 15px;
   }
 }
 
@@ -282,14 +272,32 @@ body.sidebar-visible #history-sidebar {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 60px 30px 0 30px; /* Vieta "Naujas pokalbis" mygtukui */
+  padding: 60px 30px 0 30px; /* Vieta "Naujas pokalbis" */
   transition: background-color 0.2s;
   overflow-y: auto;
-  position: relative;
+  width: 100%;
 }
 
 #chat-container.drag-over {
   background-color: var(--hover-bg);
+}
+
+.new-chat-button {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  background-color: var(--accent-color);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.new-chat-button:hover {
+  background-color: #005fa3;
 }
 
 h1 {
@@ -311,24 +319,6 @@ h1 {
   transform: translateX(-50%);
   width: 100%;
   z-index: 1001;
-}
-
-.new-chat-button {
-  position: absolute;
-  top: 15px;
-  left: 15px;
-  z-index: 1001;
-  background-color: var(--accent-color);
-  color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.new-chat-button:hover {
-  background-color: #005fa3;
 }
 
 #chat-box {
@@ -423,10 +413,15 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 20px 0 20px 0;
-  position: relative;
-  bottom: 0;
-  margin-bottom: env(safe-area-inset-bottom, 10px); /* Prisitaikymas prie apačios */
+  padding: 20px 0;
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 10px);
+  width: 100%;
+  background-color: var(--shell-bg);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  padding-left: 15px;
+  padding-right: 15px;
+  z-index: 1000;
 }
 
 .input-area {
@@ -626,12 +621,11 @@ button:active {
   #chat-container {
     padding: 60px 15px 0 15px; /* Vieta "Naujas pokalbis" */
     width: 100%;
-    padding-bottom: 10px; /* Minimalus apačios padding, prisitaikys dinamiškai */
   }
 
   h1 {
     font-size: 1.2rem;
-    padding-left: 15px; /* Vieta šalia mygtuko */
+    padding-left: 15px;
     text-align: left;
     top: 15px;
     left: 15px;
@@ -645,19 +639,6 @@ button:active {
   }
 
   #chat-form {
-    padding: 10px 0 10px 0;
-    margin-bottom: 0; /* Prisitaikys prie klaviatūros */
-    position: fixed;
-    bottom: env(safe-area-inset-bottom, 10px);
-    width: 100%;
-    background-color: var(--shell-bg);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-
-  #user-input {
-    padding: 8px;
-    flex-grow: 1;
+    padding: 10px 0;
   }
 }
