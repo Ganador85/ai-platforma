@@ -24,14 +24,13 @@ body {
   margin: 0;
   padding: 0;
   color: var(--text-color);
-  /* Panaikinti nereikalingi flexbox atributai body, kad išvengti problemų su pozicionavimu */
 }
 
 .app-shell {
   width: 100%;
   max-width: 1000px;
-  height: 100vh; /* Pakeista į 100vh, kad užpildytų visą aukštį */
-  margin: 0 auto; /* Centruoja konteinerį horizontaliai */
+  height: 100vh;
+  margin: 0 auto;
   background-color: var(--shell-bg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -40,21 +39,19 @@ body {
 }
 
 #menu-toggle-btn {
-  display: none; /* Pagal nutylėjimą paslėptas, rodomas tik @media taisyklėje */
-  position: absolute;
-  top: 15px; /* Sureguliuota pozicija */
-  left: 15px;
+  display: none;
   z-index: 1001;
   background: transparent;
-  padding: 8px; /* Padidintas plotas, kad būtų lengviau paspausti */
+  padding: 8px;
   border: none;
-  border-radius: 50%; /* Padarytas apvalus */
+  border-radius: 50%;
   color: var(--text-color);
+  flex-shrink: 0; /* Neleidžia susispausti */
 }
 
 #menu-toggle-btn:hover {
   background-color: var(--hover-bg);
-  transform: none; /* Hover efektas jau yra mygtukams */
+  transform: none;
 }
 
 #menu-toggle-btn svg {
@@ -85,7 +82,7 @@ body.sidebar-visible #overlay {
   flex-direction: column;
   border-right: 1px solid var(--border-color);
   flex-shrink: 0;
-  transition: transform 0.3s ease-in-out; /* Pakeista iš 'all' į 'transform' geresniam našumui */
+  transition: transform 0.3s ease-in-out;
   z-index: 999;
 }
 
@@ -98,7 +95,6 @@ body.sidebar-visible #overlay {
   gap: 10px;
 }
 
-/* Sujungiau paieškos konteinerio stilius su antrašte, kad būtų paprasčiau */
 .sidebar-header #search-form {
   position: relative;
 }
@@ -150,10 +146,10 @@ body.sidebar-visible #overlay {
 }
 
 .sidebar-main-content {
-  flex-grow: 1; /* Pakeista, kad užimtų visą likusią erdvę */
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden; /* Paslėpta, kad atsirastų scrollbar tik #history-list */
+  overflow-y: hidden;
 }
 
 #history-list {
@@ -180,8 +176,8 @@ body.sidebar-visible #overlay {
   margin: 2px 10px;
   transition: all 0.2s ease-in-out;
   font-size: 0.9rem;
-  overflow: hidden; /* Paslėpti tekstą, kuris netelpa */
-  text-overflow: ellipsis; /* Pridėti daugtaškį, jei netelpa */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #history-list li:hover {
@@ -204,13 +200,13 @@ body.sidebar-visible #overlay {
   right: 15px;
   top: 50%;
   transform: translateY(-50%);
-  display: none; /* Pakeista iš opacity, kad nebūtų problemų su paspaudimais */
+  display: none;
   gap: 8px;
   background-color: var(--hover-bg);
 }
 
 #history-list li:hover .history-item-actions {
-  display: flex; /* Rodyti tik užvedus pelę */
+  display: flex;
 }
 
 .history-item-actions button {
@@ -243,40 +239,57 @@ body.sidebar-visible #overlay {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px 30px 0 30px;
+  padding: 15px 15px 0 15px; /* Pakeistas padding */
   transition: background-color 0.2s;
-  overflow: hidden; /* Svarbu, kad chat-box scroll veiktų teisingai */
+  overflow: hidden;
 }
 
 #chat-container.drag-over {
   background-color: var(--hover-bg);
 }
 
+/* PAKEITIMAS: Bendras konteineris mygtukui ir antraštei */
+.main-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 15px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    background-color: var(--shell-bg); /* Svarbu, kad slenkant nesimatytų tekstas po apačia */
+    transition: transform 0.3s ease-in-out;
+}
+
+/* PAKEITIMAS: Stilius paslėptai antraštei */
+.main-header.header-hidden {
+    transform: translateY(-120%);
+}
+
 h1 {
-  text-align: center;
-  margin: 0 0 20px 0; /* Pakeistas margin-top */
+  /* PAKEITIMAS: Atnaujinti stiliai geresniam lygiavimui */
+  margin: 0;
   font-weight: 600;
-  flex-shrink: 0;
-  font-size: 1.5rem; /* Sumažinta, kad atrodytų subtiliau */
-  background: linear-gradient(90deg, #e0e0e0, #a0a0a0, #e0e0e0);
-  background-size: 200% auto;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: textShine 5s linear infinite;
+  font-size: 1.2rem;
+  background: none;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  animation: none;
+  text-align: left;
+  flex-grow: 1;
 }
 
 #chat-box {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 0 15px 15px 5px; /* Pakeistas padding, kad atitiktų scrollbar */
-  margin-right: -15px; /* Kompensuoti padding-right */
+  padding: 0 10px 15px 0;
+  margin-right: -10px;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Padidintas tarpas tarp žinučių */
+  gap: 15px;
 }
 
-/* Stiliai scrollbar'ui */
 #chat-box::-webkit-scrollbar { width: 8px; }
 #chat-box::-webkit-scrollbar-track { background: transparent; }
 #chat-box::-webkit-scrollbar-thumb { background-color: #333; border-radius: 4px; }
@@ -285,12 +298,12 @@ h1 {
 .user-message,
 .ai-message {
   border-radius: 18px;
-  padding: 12px 18px;
+  padding: 10px 16px; /* Sumažintas padding */
   max-width: 85%;
   white-space: pre-wrap;
   line-height: 1.5;
-  word-wrap: break-word; /* Pridėta, kad ilgas tekstas be tarpų būtų perkeltas */
-  font-size: 0.95rem; /* PAMAŽINTAS ŠRIFTAS */
+  word-wrap: break-word;
+  font-size: 0.9rem; /* PAKEITIMAS: Dar labiau sumažintas šriftas */
 }
 
 .user-message {
@@ -338,7 +351,7 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 20px 0 25px 0;
+  padding: 15px 0 20px 0; /* Pakeistas padding */
 }
 
 .input-area {
@@ -419,12 +432,12 @@ button:active {
   border: 1px solid var(--border-color);
   background-color: #2b2b2b;
   color: white;
-  font-size: 0.95rem; /* PAMAŽINTAS ŠRIFTAS */
+  font-size: 0.9rem; /* PAKEITIMAS: Dar labiau sumažintas šriftas */
   font-family: 'Inter', sans-serif;
   transition: all 0.2s ease-in-out;
   resize: none;
-  overflow-y: hidden; /* Bus valdoma JS */
-  min-height: 48px; /* Nustatytas minimalus aukštis */
+  overflow-y: hidden;
+  min-height: 48px;
 }
 
 #user-input:focus {
@@ -492,16 +505,10 @@ button:active {
 .indicator-container { background-color: transparent; padding: 10px 18px; }
 .indicator-container img { width: 50px; height: auto; }
 
-@keyframes textShine {
-  to {
-    background-position: 200% center;
-  }
-}
-
 .sidebar-footer {
   padding: 15px;
   border-top: 1px solid var(--border-color);
-  flex-shrink: 0; /* Neleidžia susispausti */
+  flex-shrink: 0;
 }
 
 /* Media Queries for Mobile Responsiveness */
@@ -516,25 +523,24 @@ button:active {
 
   #history-sidebar {
     position: fixed;
-    left: 0; /* Pakeista iš left: calc(...) */
-    transform: translateX(calc(-1 * var(--sidebar-width) - 2px)); /* Pridėtas perstūmimas */
+    left: 0;
+    transform: translateX(calc(-1 * var(--sidebar-width) - 2px));
     top: 0;
     height: 100%;
     border-right: 1px solid var(--border-color);
     box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.2);
   }
 
-  /* PATAISYMAS: Pridėtas tarpas šoninio meniu viršuje, kad neuždengtų meniu mygtuko */
   .sidebar-header {
     padding-top: 60px;
   }
 
   body.sidebar-visible #history-sidebar {
-    transform: translateX(0); /* Atvažiavimas į vietą */
+    transform: translateX(0);
   }
 
   #chat-container {
-    padding: 15px;
+    padding: 10px 10px 0 10px;
     width: 100%;
   }
 
@@ -543,13 +549,10 @@ button:active {
   }
 
   h1 {
-    font-size: 1.2rem;
-    padding-left: 45px; /* Padaryta vietos meniu mygtukui */
-    text-align: left;
-    margin-bottom: 15px; /* Sumažintas tarpas */
+    font-size: 1.1rem; /* Sumažinta antraštė mobiliesiems */
   }
 
   #menu-toggle-btn {
-    display: flex;
+    display: flex; /* Rodo meniu mygtuką mobiliojoje versijoje */
   }
 }
