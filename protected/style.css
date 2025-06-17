@@ -106,7 +106,7 @@ body.sidebar-visible #history-sidebar {
 
 @media (max-width: 768px) {
   #history-sidebar {
-    top: env(safe-area-inset-top, 10px); /* Prasideda nuo saugaus ploto */
+    top: env(safe-area-inset-top, 10px);
     height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px));
   }
 
@@ -269,13 +269,14 @@ body.sidebar-visible #history-sidebar {
 
 #chat-container {
   flex-grow: 1;
-  height: 100%;
+  height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Aukštis atsižvelgiant į "Naujas pokalbis" */
   display: flex;
   flex-direction: column;
   padding: 60px 30px 0 30px; /* Vieta "Naujas pokalbis" */
   transition: background-color 0.2s;
   overflow-y: auto;
   width: 100%;
+  margin-left: var(--sidebar-width); /* Vieta šoninei juostai */
 }
 
 #chat-container.drag-over {
@@ -329,9 +330,8 @@ h1 {
   border: none;
   background-color: transparent;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* Naujienos apačioje */
   gap: 10px;
-  margin-top: 60px; /* Vieta "Naujas pokalbis" */
 }
 
 #chat-box::-webkit-scrollbar {
@@ -413,7 +413,7 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 20px 0;
+  padding: 10px 0;
   position: fixed;
   bottom: env(safe-area-inset-bottom, 10px);
   width: 100%;
@@ -619,8 +619,9 @@ button:active {
   }
 
   #chat-container {
-    padding: 60px 15px 0 15px; /* Vieta "Naujas pokalbis" */
-    width: 100%;
+    padding: 60px 15px 0 15px;
+    height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px) - 60px); /* Aukštis atsižvelgiant į "Naujas pokalbis" ir formą */
+    margin-left: 0; /* Nėra šoninės juostos poveikio */
   }
 
   h1 {
