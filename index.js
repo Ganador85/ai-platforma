@@ -12,7 +12,8 @@ import fs from 'fs';
 import multer from 'multer';
 import sanitizeHtml from 'sanitize-html';
 import { extractTextFromFile } from './extractTextFromFile.js';
-import axios from 'axios'; // PRIDĖTA: Axios biblioteka paieškai
+// --- PRIDĖTA: SerpAPI paieškos funkcija ---
+import { searchSerpApi } from './searchSerpApi.js';
 
 // --- APLINKOS KONFIGŪRACIJA ---
 dotenv.config();
@@ -251,71 +252,12 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
         res.status(500).json({ error: "Serverio klaida įkeliant failą." });
     }
 });
-
+// ======================================================================
+//  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
+// ======================================================================
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
     const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
-
-    // --- PRADŽIA: PAIEŠKOS LOGIKOS BLOKAS ---
-    const userPrompt = sanitizedMessage.trim();
-    const searchKeywords = ["ieškok", "parodyk internete", "search"];
-    
-    if (userPrompt && searchKeywords.some(keyword => userPrompt.toLowerCase().includes(keyword))) {
-        let convId = conversation_id;
-        const userUUID = req.session.userUuid;
-        let isNewConversation = false;
-
-        try {
-            if (!userUUID) {
-                return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
-            }
-
-            if (!convId || convId === 'null') {
-                isNewConversation = true;
-                const newConv = await pool.query(
-                    "INSERT INTO conversations (title, user_uuid) VALUES ($1, $2) RETURNING id",
-                    ["Paieška internete", userUUID]
-                );
-                convId = newConv.rows[0].id;
-            }
-
-            await pool.query(
-                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
-                [convId, userPrompt, userUUID]
-            );
-
-            const searchResults = await searchDuckDuckGo(userPrompt);
-
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.flushHeaders();
-
-            res.write(`data: ${JSON.stringify({ content: searchResults, conversation_id: convId })}\n\n`);
-
-            await pool.query(
-                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3)",
-                [convId, searchResults, userUUID]
-            );
-            await pool.query("UPDATE conversations SET updated_at = NOW() WHERE id = $1", [convId]);
-            
-            if (isNewConversation) {
-                 res.write(`data: ${JSON.stringify({ event: 'title_updated', title: "Paieška internete" })}\n\n`);
-            }
-
-            res.write('data: [DONE]\n\n');
-            return res.end();
-
-        } catch (error) {
-            console.error("Paieškos klaida:", error);
-            if (!res.headersSent) {
-                return res.status(500).json({ reply: "Nepavyko atlikti paieškos internete." });
-            }
-            res.end();
-        }
-        return; // Svarbu, kad sustabdytų vykdymą ir neitų prie GPT logikos
-    }
-    // --- PABAIGA: PAIEŠKOS LOGIKOS BLOKAS ---
 
     if (!sanitizedMessage && (!req.files || req.files.length === 0)) {
         return res.status(400).json({ reply: "Klaida: pranešimas ir failai negali būti tušti." });
@@ -330,11 +272,11 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
         }
 
+        // --- Atminties komandų valdymas ---
         if (isMemoryCommand(sanitizedMessage)) {
             const infoToRemember = extractMemoryContent(sanitizedMessage);
             if (infoToRemember) {
                 await updateUserMemory(userUUID, infoToRemember);
-                
                 res.setHeader('Content-Type', 'text/event-stream');
                 res.setHeader('Cache-Control', 'no-cache');
                 res.setHeader('Connection', 'keep-alive');
@@ -345,8 +287,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
 
-        const memoryContent = await getUserMemory(userUUID);
-
+        // --- Pokalbio paruošimas ---
         if (!convId || convId === 'null') {
             isNewConversation = true;
             const defaultAssistantRes = await pool.query("SELECT id FROM assistants ORDER BY created_at ASC LIMIT 1");
@@ -361,6 +302,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             convId = newConv.rows[0].id;
         }
 
+        // --- Vartotojo žinutės įrašymas ---
         if (sanitizedMessage) {
             await pool.query(
                 "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
@@ -368,6 +310,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             );
         }
 
+        // --- Failų apdorojimas ---
         let fileContext = "";
         if (req.files && req.files.length > 0) {
             for (const file of req.files) {
@@ -387,6 +330,37 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
 
+        // --- Paieškos logika ---
+        const searchKeywords = [
+            "ieškok", "parodyk internete", "search", "surask",
+            "ką žinai apie", "kas yra", "papasakok apie", "trumpai apie",
+            "ka žinai apie", "kas tai", "kas buvo", "kas vyksta", "ką reiškia"
+        ];
+        const systemSearchPrompt = `Tu esi pagalbininkas, kuris moka naudotis interneto paieška. Jei gali atsakyti pats – atsakyk į klausimą kaip visada. Jei negali atsakyti, bet klausimas reikalauja paieškos, atsakyk taip: SEARCH: trumpa paieškos frazė. Pavyzdžiai: User: Kas yra Sintra.ai? Assistant: SEARCH: Sintra.ai AI platforma. User: Koks šiandien oras Londone? Assistant: SEARCH: orai Londone šiandien. User: Kaip iškepti pyragą? Assistant: Galiu tau paaiškinti – pirmiausia reikės miltų, kiaušinių... Svarbu: niekada nerašyk „Atsiprašau, aš nežinau“. Jei reikia – inicijuok paiešką.`;
+
+        let searchNeeded = false;
+        let searchQuery = "";
+        const promptLower = sanitizedMessage.toLowerCase();
+
+        if (sanitizedMessage && searchKeywords.some(keyword => promptLower.includes(keyword))) {
+            searchNeeded = true;
+            searchQuery = sanitizedMessage;
+        } else if (sanitizedMessage) {
+            const gptDecision = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemSearchPrompt },
+                    { role: "user", content: sanitizedMessage }
+                ],
+            });
+            const decisionText = gptDecision.choices[0].message.content;
+            if (decisionText.startsWith("SEARCH:")) {
+                searchNeeded = true;
+                searchQuery = decisionText.replace("SEARCH:", "").trim();
+            }
+        }
+
+        // --- Istorijos ir sistemos pranešimų paruošimas ---
         const messagesRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 AND content IS NOT NULL ORDER BY created_at ASC LIMIT 200", [convId]);
         const chatHistory = messagesRes.rows.map(row => ({ role: row.role, content: row.content }));
 
@@ -394,21 +368,27 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].role !== 'user') {
                  chatHistory.push({ role: 'user', content: fileContext.trim() });
             } else {
-                chatHistory[chatHistory.length - 1].content += fileContext;
+                 chatHistory[chatHistory.length - 1].content += fileContext;
             }
         }
-
+        
+        const memoryContent = await getUserMemory(userUUID);
         const systemPromptRes = await pool.query("SELECT a.system_prompt FROM assistants a JOIN conversations c ON a.id = c.assistant_id WHERE c.id = $1", [convId]);
-        const systemPrompt = systemPromptRes.rows[0]?.system_prompt || "Tu esi draugiškas AI pagalbininkas.";
-        chatHistory.unshift({ role: "system", content: systemPrompt });
-
+        let systemPrompt = systemPromptRes.rows[0]?.system_prompt || "Tu esi draugiškas AI pagalbininkas.";
+        
         if (memoryContent && memoryContent.trim() !== '') {
-            chatHistory.unshift({
-                role: 'system',
-                content: `Tai yra ilgalaikė informacija apie vartotoją, į kurią privalai atsižvelgti: ${memoryContent}`,
-            });
+            systemPrompt += `\n\nTai yra ilgalaikė informacija apie vartotoją, į kurią privalai atsižvelgti: ${memoryContent}`;
         }
 
+        // --- Galutinės užklausos formavimas ir siuntimas į OpenAI ---
+        if (searchNeeded) {
+            console.log(`Inicijuojama paieška su užklausa: "${searchQuery}"`);
+            const searchResults = await searchSerpApi(searchQuery);
+            systemPrompt += `\n\nRemkis šia interneto paieškos informacija, kad atsakytum į vartotojo klausimą. Informacija: """${searchResults}"""`;
+        }
+
+        chatHistory.unshift({ role: "system", content: systemPrompt });
+        
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -424,21 +404,14 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
                 res.write(`data: ${JSON.stringify({ content, conversation_id: convId })}\n\n`);
             }
         }
-
+        
+        // --- Atsakymo išsaugojimas ir pabaigos veiksmai ---
         if (fullReply) {
             const inserted = await pool.query(
                 "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3) RETURNING id",
                 [convId, fullReply, userUUID]
             );
-            try {
-                const embeddingRes = await openai.embeddings.create({ model: "text-embedding-ada-002", input: fullReply });
-                const vector = embeddingRes?.data?.[0]?.embedding;
-                if (vector && Array.isArray(vector)) {
-                    await pool.query("UPDATE messages SET embedding = $1 WHERE id = $2", [JSON.stringify(vector), inserted.rows[0].id]);
-                }
-            } catch (embeddingError) {
-                console.error("Klaida generuojant embedding'ą:", embeddingError.message);
-            }
+
             await pool.query("UPDATE conversations SET updated_at = NOW() WHERE id = $1", [convId]);
 
             if (isNewConversation && (sanitizedMessage || (req.files && req.files.length > 0))) {
@@ -452,13 +425,6 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
         res.write('data: [DONE]\n\n');
         res.end();
 
-        if (isNewConversation) {
-            const oldestConvRes = await pool.query("SELECT id FROM conversations WHERE user_uuid = $1 ORDER BY created_at ASC OFFSET 500 LIMIT 1", [userUUID]);
-            if (oldestConvRes.rows.length > 0) {
-                await deleteConversation(oldestConvRes.rows[0].id);
-            }
-        }
-
     } catch (error) {
         console.error("Klaida /ask maršrute:", error.message);
         if (!res.headersSent) {
@@ -468,8 +434,6 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
         }
     }
 });
-
-
 app.post("/search", checkAuth, async (req, res) => {
     const { query } = req.body;
     if (!query) {
@@ -596,180 +560,18 @@ app.post('/admin/unapprove', checkAuth, checkAdmin, bodyParser.urlencoded({ exte
         res.status(500).send("Klaida atšaukiant vartotojo patvirtinimą.");
     }
 });
-
-
 //======================================================================
 //  4. PAGALBINĖS FUNKCIJOS IR SERVERIO PALEIDIMAS
 //======================================================================
 
-async function searchDuckDuckGo(query) {
-    try {
-        // Išvalome paieškos raktažodžius iš pačios užklausos
-        const cleanQuery = query.toLowerCase().replace("ieškok", "").replace("parodyk internete", "").replace("search", "").trim();
-        const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&pretty=1&no_html=1&skip_disambig=1`);
-        
-        const mainAnswer = response.data.AbstractText;
-        const relatedTopics = response.data.RelatedTopics.filter(topic => topic.Text).slice(0, 4);
-
-        if (!mainAnswer && relatedTopics.length === 0) {
-            return "Atsiprašau, pagal jūsų užklausą internete nieko konkretaus rasti nepavyko.";
-        }
-
-        let resultText = "";
-        if (mainAnswer) {
-            resultText += `**Pagrindinis atsakymas:**\n${mainAnswer}\n\n`;
-        }
-        if (relatedTopics.length > 0) {
-            resultText += "**Susijusios temos:**\n";
-            resultText += relatedTopics.map(r => `- ${r.Text}`).join('\n');
-        }
-        
-        return resultText.trim();
-    } catch (error) {
-        console.error("DuckDuckGo paieškos klaida:", error.message);
-        return "Atsiprašome, įvyko klaida atliekant paiešką internete.";
-    }
-}
-
-const memoryTriggers = [
-    "prisimink", "prisiminti", "isimink", "isiminti",
-    "issaugok", "issaugoti", "isirasyk", "irasik",
-    "atsimink", "uzfiksuok", "turek omenyje", "atmink"
-];
-
-function normalize(text) {
-    if (!text) return "";
-    return text
-        .toLowerCase()
-        .replace(/ą/g, "a").replace(/č/g, "c").replace(/ę/g, "e")
-        .replace(/ė/g, "e").replace(/į/g, "i").replace(/š/g, "s")
-        .replace(/ų/g, "u").replace(/ū/g, "u").replace(/ž/g, "z");
-}
-
-function isMemoryCommand(message) {
-    const cleaned = normalize(message.trim());
-    return memoryTriggers.some(trigger =>
-        cleaned.startsWith(trigger + " ") || cleaned.startsWith(trigger + ",") || cleaned === trigger
-    );
-}
-
-function extractMemoryContent(message) {
-    const normalizedMessage = normalize(message.trim());
-    const foundTrigger = memoryTriggers.find(trigger => normalizedMessage.startsWith(trigger));
-    
-    if (!foundTrigger) return message;
-
-    const originalWords = message.trim().split(/\s+/);
-    const triggerWords = foundTrigger.split(/\s+/);
-    
-    // Randa pirmo žodžio poziciją po trigerio
-    let startIndex = -1;
-    for (let i = 0; i <= originalWords.length - triggerWords.length; i++) {
-        let match = true;
-        for (let j = 0; j < triggerWords.length; j++) {
-            if (normalize(originalWords[i+j]) !== triggerWords[j]) {
-                match = false;
-                break;
-            }
-        }
-        if (match) {
-            startIndex = i + triggerWords.length;
-            break;
-        }
-    }
-    
-    if (startIndex !== -1) {
-        return originalWords.slice(startIndex).join(" ").trim();
-    }
-
-    return message; // Grąžina originalą, jei kažkas nepavyko
-}
-
-
-async function getUserMemory(user_uuid) {
-    if (!user_uuid) return '';
-    try {
-        const result = await pool.query('SELECT content FROM memories WHERE user_uuid = $1', [user_uuid]);
-        if (result.rows.length > 0) {
-            return result.rows[0].content;
-        } else {
-            await pool.query('INSERT INTO memories (user_uuid, content) VALUES ($1, $2)', [user_uuid, '']);
-            return '';
-        }
-    } catch (error) {
-        console.error(`Klaida gaunant atmintį vartotojui ${user_uuid}:`, error.message);
-        return '';
-    }
-}
-
-async function updateUserMemory(user_uuid, newInfo) {
-    try {
-        const existing = await pool.query('SELECT content FROM memories WHERE user_uuid = $1', [user_uuid]);
-        let updatedContent = newInfo;
-        if (existing.rows.length > 0 && existing.rows[0].content && existing.rows[0].content.trim() !== '') {
-            updatedContent = existing.rows[0].content + '\n' + newInfo;
-        }
-        await pool.query(
-            `INSERT INTO memories (user_uuid, content) VALUES ($1, $2)
-             ON CONFLICT (user_uuid) DO UPDATE SET content = $2, updated_at = now()`,
-            [user_uuid, updatedContent]
-        );
-    } catch (error) {
-        console.error(`Klaida atnaujinant atmintį vartotojui ${user_uuid}:`, error.message);
-    }
-}
-
-
-async function deleteConversation(conversationId) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const docsToDelete = await client.query('SELECT filepath FROM uploaded_documents WHERE conversation_id = $1', [conversationId]);
-        for (const doc of docsToDelete.rows) {
-            fs.unlink(doc.filepath, (err) => {
-                if (err) { console.error(`Nepavyko ištrinti failo ${doc.filepath}:`, err); }
-                else { console.log(`Sėkmingai ištrintas failas: ${doc.filepath}`); }
-            });
-        }
-        await client.query('DELETE FROM conversations WHERE id = $1', [conversationId]);
-        await client.query('COMMIT');
-        console.log(`Sėkmingai ištrintas pokalbis ir susiję failai: ${conversationId}`);
-        return { success: true };
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error(`Klaida trinant pokalbį ${conversationId}:`, error.message);
-        return { success: false, error: error.message };
-    } finally {
-        client.release();
-    }
-}
-
-async function generateAndSaveTitle(conversationId, userMessage, aiMessage) {
-    try {
-        const userPromptPart = userMessage
-            ? `Vartotojas: "${userMessage}"`
-            : 'Vartotojas įkėlė dokumentą analizei.';
-
-        const prompt = `Remdamasis šiuo pokalbiu, sugeneruok trumpą, 4-6 žodžių pavadinimą lietuvių kalba. Nenaudok kabučių.\n\n${userPromptPart}\nAsistentas: "${aiMessage.substring(0, 300)}..."\n\nPavadinimas:`;
-
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.5,
-            max_tokens: 20,
-        });
-
-        let newTitle = response.choices[0].message.content.trim().replace(/"/g, '');
-        if (newTitle) {
-            await pool.query("UPDATE conversations SET title = $1 WHERE id = $2", [newTitle, conversationId]);
-            console.log(`Sėkmingai atnaujintas pavadinimas pokalbiui ${conversationId}: ${newTitle}`);
-            return newTitle;
-        }
-    } catch (error) {
-        console.error("Klaida generuojant pavadinimą:", error.message);
-    }
-    return null;
-}
+const memoryTriggers = [ "prisimink", "prisiminti", "isimink", "isiminti", "issaugok", "issaugoti", "isirasyk", "irasik", "atsimink", "uzfiksuok", "turek omenyje", "atmink" ];
+function normalize(text) { if (!text) return ""; return text.toLowerCase().replace(/ą/g, "a").replace(/č/g, "c").replace(/ę/g, "e").replace(/ė/g, "e").replace(/į/g, "i").replace(/š/g, "s").replace(/ų/g, "u").replace(/ū/g, "u").replace(/ž/g, "z"); }
+function isMemoryCommand(message) { const cleaned = normalize(message.trim()); return memoryTriggers.some(trigger => cleaned.startsWith(trigger + " ") || cleaned.startsWith(trigger + ",") || cleaned === trigger); }
+function extractMemoryContent(message) { const normalizedMessage = normalize(message.trim()); const foundTrigger = memoryTriggers.find(trigger => normalizedMessage.startsWith(trigger)); if (!foundTrigger) return message; const originalWords = message.trim().split(/\s+/); const triggerWords = foundTrigger.split(/\s+/); let startIndex = -1; for (let i = 0; i <= originalWords.length - triggerWords.length; i++) { let match = true; for (let j = 0; j < triggerWords.length; j++) { if (normalize(originalWords[i+j]) !== triggerWords[j]) { match = false; break; } } if (match) { startIndex = i + triggerWords.length; break; } } if (startIndex !== -1) { return originalWords.slice(startIndex).join(" ").trim(); } return message; }
+async function getUserMemory(user_uuid) { if (!user_uuid) return ''; try { const result = await pool.query('SELECT content FROM memories WHERE user_uuid = $1', [user_uuid]); if (result.rows.length > 0) { return result.rows[0].content; } else { await pool.query('INSERT INTO memories (user_uuid, content) VALUES ($1, $2)', [user_uuid, '']); return ''; } } catch (error) { console.error(`Klaida gaunant atmintį vartotojui ${user_uuid}:`, error.message); return ''; } }
+async function updateUserMemory(user_uuid, newInfo) { try { const existing = await pool.query('SELECT content FROM memories WHERE user_uuid = $1', [user_uuid]); let updatedContent = newInfo; if (existing.rows.length > 0 && existing.rows[0].content && existing.rows[0].content.trim() !== '') { updatedContent = existing.rows[0].content + '\n' + newInfo; } await pool.query(`INSERT INTO memories (user_uuid, content) VALUES ($1, $2) ON CONFLICT (user_uuid) DO UPDATE SET content = $2, updated_at = now()`, [user_uuid, updatedContent] ); } catch (error) { console.error(`Klaida atnaujinant atmintį vartotojui ${user_uuid}:`, error.message); } }
+async function deleteConversation(conversationId) { const client = await pool.connect(); try { await client.query('BEGIN'); const docsToDelete = await client.query('SELECT filepath FROM uploaded_documents WHERE conversation_id = $1', [conversationId]); for (const doc of docsToDelete.rows) { fs.unlink(doc.filepath, (err) => { if (err) { console.error(`Nepavyko ištrinti failo ${doc.filepath}:`, err); } else { console.log(`Sėkmingai ištrintas failas: ${doc.filepath}`); } }); } await client.query('DELETE FROM conversations WHERE id = $1', [conversationId]); await client.query('COMMIT'); console.log(`Sėkmingai ištrintas pokalbis ir susiję failai: ${conversationId}`); return { success: true }; } catch (error) { await client.query('ROLLBACK'); console.error(`Klaida trinant pokalbį ${conversationId}:`, error.message); return { success: false, error: error.message }; } finally { client.release(); } }
+async function generateAndSaveTitle(conversationId, userMessage, aiMessage) { try { const userPromptPart = userMessage ? `Vartotojas: "${userMessage}"` : 'Vartotojas įkėlė dokumentą analizei.'; const prompt = `Remdamasis šiuo pokalbiu, sugeneruok trumpą, 4-6 žodžių pavadinimą lietuvių kalba. Nenaudok kabučių.\n\n${userPromptPart}\nAsistentas: "${aiMessage.substring(0, 300)}..."\n\nPavadinimas:`; const response = await openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: prompt }], temperature: 0.5, max_tokens: 20, }); let newTitle = response.choices[0].message.content.trim().replace(/"/g, ''); if (newTitle) { await pool.query("UPDATE conversations SET title = $1 WHERE id = $2", [newTitle, conversationId]); console.log(`Sėkmingai atnaujintas pavadinimas pokalbiui ${conversationId}: ${newTitle}`); return newTitle; } } catch (error) { console.error("Klaida generuojant pavadinimą:", error.message); } return null; }
 
 app.listen(port, () => {
   console.log(`Serveris veikia adresu: http://localhost:${port}`);
