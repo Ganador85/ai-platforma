@@ -29,39 +29,39 @@ body {
   color: var(--text-color);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* Pakeista iš center, kad būtų prie viršaus */
   min-height: 100vh;
-  padding-top: env(safe-area-inset-top, 40px); /* Padidintas saugus plotas viršuje */
-  padding-bottom: env(safe-area-inset-bottom, 80px); /* Padidintas saugus plotas apačioje */
+  padding-top: env(safe-area-inset-top, 10px); /* Minimalus saugus plotas */
+  padding-bottom: env(safe-area-inset-bottom, 10px);
   overflow-x: hidden;
 }
 
 .app-shell {
   width: 95%;
   max-width: 1000px;
-  height: calc(85vh - env(safe-area-inset-top, 40px) - env(safe-area-inset-bottom, 80px)); /* Dinamiškas aukštis */
-  max-height: 800px;
+  height: auto; /* Dinamiškas aukštis pagal turinį */
+  min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px)); /* Minimalus aukštis */
   background-color: var(--shell-bg);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex;
   overflow: hidden;
   position: relative;
-  margin-top: env(safe-area-inset-top, 40px);
-  margin-bottom: env(safe-area-inset-bottom, 80px);
+  margin-top: env(safe-area-inset-top, 10px);
+  margin-bottom: env(safe-area-inset-bottom, 10px);
 }
 
 #menu-toggle-btn {
   display: none;
   position: absolute;
-  top: 20px; /* Šiek tiek žemiau */
+  top: 15px;
   left: 15px;
   z-index: 1002;
   background: transparent;
   padding: 8px;
   border: none;
   cursor: pointer;
-  margin-left: 20px; /* Daugiau vietos "Naujas pokalbis" */
+  margin-left: 0; /* Nustatoma vėliau */
 }
 
 #menu-toggle-btn:hover {
@@ -87,27 +87,30 @@ body.sidebar-visible #overlay {
 #history-sidebar {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
-  height: 100%;
+  height: 100%; /* Užpildo visą aukštį */
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start; /* Elementai iš pradžių */
   border-right: 1px solid var(--border-color);
   flex-shrink: 0;
   transition: transform 0.3s ease-in-out;
   z-index: 1000;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateX(calc(-1 * var(--sidebar-width))); /* Slėpta iš pradžių */
 }
 
 body.sidebar-visible #history-sidebar {
-  transform: translateX(0);
+  transform: translateX(0); /* Atidaroma */
 }
 
 @media (max-width: 768px) {
   #history-sidebar {
     position: fixed;
-    top: env(safe-area-inset-top, 40px); /* Prasideda nuo saugaus ploto */
+    top: 60px; /* Pradedama žemiau "Naujas pokalbis" */
     left: 0;
-    height: calc(100vh - env(safe-area-inset-top, 40px) - env(safe-area-inset-bottom, 80px));
+    height: calc(100vh - 60px - env(safe-area-inset-bottom, 10px)); /* Aukštis pagal likusią erdvę */
     transform: translateX(calc(-1 * var(--sidebar-width)));
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
   }
@@ -115,15 +118,18 @@ body.sidebar-visible #history-sidebar {
   body.sidebar-visible #history-sidebar {
     transform: translateX(0);
   }
+
+  #menu-toggle-btn {
+    display: flex;
+    margin-left: 15px; /* Vieta šalia "Naujas pokalbis" */
+    top: 15px;
+  }
 }
 
 .sidebar-header {
   padding: 15px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .search-container {
@@ -183,6 +189,7 @@ body.sidebar-visible #history-sidebar {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  flex-grow: 1;
 }
 
 #history-list {
@@ -275,9 +282,10 @@ body.sidebar-visible #history-sidebar {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px 30px 0 30px;
+  padding: 60px 30px 0 30px; /* Vieta "Naujas pokalbis" mygtukui */
   transition: background-color 0.2s;
   overflow-y: auto;
+  position: relative;
 }
 
 #chat-container.drag-over {
@@ -297,6 +305,30 @@ h1 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: textShine 5s linear infinite;
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 1001;
+}
+
+.new-chat-button {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  background-color: var(--accent-color);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.new-chat-button:hover {
+  background-color: #005fa3;
 }
 
 #chat-box {
@@ -309,6 +341,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 60px; /* Vieta "Naujas pokalbis" */
 }
 
 #chat-box::-webkit-scrollbar {
@@ -390,9 +423,10 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding: 20px 0 35px 0; /* Daugiau vietos apačioje */
+  padding: 20px 0 20px 0;
   position: relative;
   bottom: 0;
+  margin-bottom: env(safe-area-inset-bottom, 10px); /* Prisitaikymas prie apačios */
 }
 
 .input-area {
@@ -582,40 +616,48 @@ button:active {
 @media (max-width: 768px) {
   .app-shell {
     width: 100%;
-    height: calc(100vh - env(safe-area-inset-top, 40px) - env(safe-area-inset-bottom, 80px));
-    max-height: none;
+    height: auto;
+    min-height: calc(100vh - env(safe-area-inset-top, 10px) - env(safe-area-inset-bottom, 10px));
     border-radius: 0;
     margin: 0;
     padding: 0;
   }
 
-  #menu-toggle-btn {
-    display: flex;
-    margin-left: 25px; /* Dar daugiau vietos "Naujas pokalbis" */
-    top: 25px; /* Šiek tiek žemiau */
-  }
-
-  #history-sidebar {
-    margin-top: env(safe-area-inset-top, 40px);
-  }
-
   #chat-container {
-    padding: 15px;
+    padding: 60px 15px 0 15px; /* Vieta "Naujas pokalbis" */
     width: 100%;
-    padding-bottom: 100px; /* Dar daugiau vietos klaviatūrai */
+    padding-bottom: 10px; /* Minimalus apačios padding, prisitaikys dinamiškai */
   }
 
   h1 {
     font-size: 1.2rem;
-    padding-left: 70px; /* Dar daugiau vietos meniu mygtukui */
+    padding-left: 15px; /* Vieta šalia mygtuko */
     text-align: left;
+    top: 15px;
+    left: 15px;
+    transform: translateX(0);
+    width: auto;
+  }
+
+  .new-chat-button {
+    top: 15px;
+    left: 15px;
   }
 
   #chat-form {
-    padding: 10px 0 30px 0; /* Daugiau vietos apačioje */
+    padding: 10px 0 10px 0;
+    margin-bottom: 0; /* Prisitaikys prie klaviatūros */
+    position: fixed;
+    bottom: env(safe-area-inset-bottom, 10px);
+    width: 100%;
+    background-color: var(--shell-bg);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    padding-left: 15px;
+    padding-right: 15px;
   }
 
   #user-input {
     padding: 8px;
+    flex-grow: 1;
   }
 }
