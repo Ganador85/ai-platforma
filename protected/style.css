@@ -29,7 +29,6 @@ body {
 .app-shell {
   width: 100%;
   max-width: 1000px;
-  /* PAKEITIMAS: Naudojamas dinaminis aukštis (dvh), kuris teisingai veikia su mobiliųjų klaviatūromis */
   height: 100dvh; 
   margin: 0 auto;
   background-color: var(--shell-bg);
@@ -47,7 +46,7 @@ body {
   border: none;
   border-radius: 50%;
   color: var(--text-color);
-  flex-shrink: 0; /* Neleidžia susispausti */
+  flex-shrink: 0;
 }
 
 #menu-toggle-btn:hover {
@@ -430,7 +429,8 @@ button:active {
   border: 1px solid var(--border-color);
   background-color: #2b2b2b;
   color: white;
-  font-size: 0.9rem;
+  /* PAKEITIMAS: Nustatytas 16px šriftas, kad naršyklė automatiškai nepriartintų vaizdo mobiliuosiuose įrenginiuose */
+  font-size: 16px; 
   font-family: 'Inter', sans-serif;
   transition: all 0.2s ease-in-out;
   resize: none;
@@ -513,7 +513,6 @@ button:active {
 @media (max-width: 768px) {
   .app-shell {
     width: 100%;
-    /* height: 100dvh; jau nustatyta pagrindinėje taisyklėje */
     max-height: none;
     border-radius: 0;
     max-width: none;
