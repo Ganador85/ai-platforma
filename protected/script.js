@@ -14,11 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuToggleBtn = document.getElementById('menu-toggle-btn');
     const overlay = document.getElementById('overlay');
     const logoutBtn = document.getElementById("logout-btn");
+    const mainHeader = document.querySelector('.main-header');
 
     // --- BŪSENOS KINTAMIEJI ---
     let conversationId = null;
     let isLoading = false;
     let stagedFiles = [];
+    let lastScrollTop = 0;
 
     // --- ĮVYKIŲ KLAUSYTOJAI ---
 	if (logoutBtn) {
@@ -42,6 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
     uploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
 
+    // PAKEITIMAS: Pridėtas klausytojas, kuris paspaudus ant įvesties laukelio prascrollina pokalbius į apačią.
+    // Tai pagerina vartotojo patirtį atsidarius klaviatūrai.
+    input.addEventListener('focus', () => {
+        setTimeout(() => {
+            messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+        }, 300); // Mažas uždelsimas, kad vartotojo sąsaja spėtų prisitaikyti prie klaviatūros
+    });
+
     if (searchForm) {
         searchForm.addEventListener('submit', handleSearchSubmit);
     }
@@ -49,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatContainer.addEventListener('dragover', handleDragOver);
     chatContainer.addEventListener('dragleave', handleDragLeave);
     chatContainer.addEventListener('drop', handleDrop);
-    
+
     if (menuToggleBtn) {
         menuToggleBtn.addEventListener('click', () => {
             document.body.classList.toggle('sidebar-visible');
@@ -62,11 +72,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (messagesContainer && mainHeader) {
+        messagesContainer.addEventListener("scroll", () => {
+            const scrollTop = messagesContainer.scrollTop;
+            if (scrollTop > lastScrollTop && scrollTop > 50) {
+                mainHeader.classList.add("header-hidden");
+            } else if (scrollTop < lastScrollTop) {
+                mainHeader.classList.remove("header-hidden");
+            }
+            lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+        });
+    }
+
     // --- PRADINIS PALEIDIMAS ---
     initializeApp();
 
     // --- FUNKCIJŲ APRAŠYMAI ---
-
     async function initializeApp() {
         const conversations = await fetchAndRenderHistory();
         if (conversations && conversations.length > 0) {
@@ -100,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isLoading = false;
         }
     }
-    
+
     function displaySearchResults(matches) {
         searchResultsContainer.innerHTML = '';
         const backButton = document.createElement('button');
@@ -108,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         backButton.className = 'back-button';
         backButton.onclick = hideSearchResults;
         searchResultsContainer.appendChild(backButton);
-        
+
         const resultsHeader = document.createElement('h3');
         resultsHeader.textContent = 'Paieškos rezultatai';
         searchResultsContainer.appendChild(resultsHeader);
@@ -122,8 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         matches.forEach(match => {
             const resultDiv = document.createElement('div');
-            resultDiv.className = 'search-result-item clickable'; 
-            resultDiv.dataset.conversationId = match.conversation_id; 
+            resultDiv.className = 'search-result-item clickable';
+            resultDiv.dataset.conversationId = match.conversation_id;
 
             resultDiv.addEventListener('click', () => {
                 const convId = resultDiv.dataset.conversationId;
@@ -158,17 +179,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hideSearchResults() {
         searchResultsContainer.style.display = 'none';
-        messagesContainer.style.display = 'block';
+        messagesContainer.style.display = 'flex';
         document.getElementById('chat-form').style.display = 'flex';
         searchInput.value = '';
     }
-    
+
     function handleFileSelect(event) {
         const files = event.target.files;
         if (!files.length) return;
         addFilesToStaging(files);
     }
-    
+
     function handleDragOver(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -252,10 +273,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ul.appendChild(li);
             });
             historyList.appendChild(ul);
-            return conversations; 
+            return conversations;
         } catch (error) {
             console.error('Klaida kraunant istoriją:', error);
-            return []; 
+            return [];
         }
     }
 
@@ -267,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         titleSpan.textContent = conv.title || 'Pokalbis be pavadinimo';
         li.appendChild(titleSpan);
         li.appendChild(createActionButtons(li, titleSpan, conv));
-        
+
         li.addEventListener('click', (e) => {
             if (e.target.closest('.history-item-actions')) return;
             hideSearchResults();
@@ -278,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return li;
     }
-    
+
     function createActionButtons(li, titleSpan, conv) {
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'history-item-actions';
@@ -359,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage('ai', '⚠️ Nepavyko užkrauti pokalbio.');
         }
     }
-    
+
     async function sendMessage() {
         if (isLoading) return;
         const userMessage = input.value.trim();
@@ -371,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (userMessage) {
             addMessage("user", userMessage);
         }
-        
+
         const formData = new FormData();
         formData.append('message', userMessage);
         if (conversationId) {
@@ -385,17 +406,17 @@ document.addEventListener('DOMContentLoaded', () => {
         autoResizeTextarea();
         stagedFiles = [];
         renderStagedFiles();
-        
+
         const aiMessageDiv = addMessage("ai", "", false);
         const typingIndicator = createTypingIndicator();
         aiMessageDiv.appendChild(typingIndicator);
-        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' }); // Pakeista
+        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
 
         try {
             const res = await fetch("/ask", { method: "POST", body: formData });
             if (!res.ok) throw new Error(`Serverio klaida: ${res.status}`);
             typingIndicator.remove();
-            
+
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let fullReplyText = "";
@@ -410,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const data = line.substring(6);
                         if (data === '[DONE]') {
                             aiMessageDiv.appendChild(createCopyButton(fullReplyText));
-                            break; 
+                            break;
                         }
                         const parsed = JSON.parse(data);
                         if (parsed.content) {
@@ -420,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (parsed.conversation_id && !conversationId) {
                             conversationId = parsed.conversation_id;
                         }
-                        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'auto' }); // 'auto' greitam slinkimui
+                        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'auto' });
                     }
                 }
                 if (chunkText.includes('[DONE]')) break;
@@ -454,11 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if(withAnimation) msgDiv.classList.add("message-enter");
         msgDiv.innerText = content;
         if (content.startsWith("⚠️")) msgDiv.classList.add("error-message");
-        if (role === 'ai' && !content.startsWith("⚠️") && content) { 
-            msgDiv.appendChild(createCopyButton(content)); 
+        if (role === 'ai' && !content.startsWith("⚠️") && content) {
+            msgDiv.appendChild(createCopyButton(content));
         }
         messagesContainer.appendChild(msgDiv);
-        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' }); // Pakeista
+        messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
         return msgDiv;
     }
 
@@ -481,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createTypingIndicator() {
         const indicatorWrapper = document.createElement("div");
-        indicatorWrapper.className = "indicator-container"; 
+        indicatorWrapper.className = "indicator-container";
         indicatorWrapper.innerHTML = `<img src="images/thinking.gif" alt="AI mąsto..." />`;
         return indicatorWrapper;
     }

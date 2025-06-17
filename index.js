@@ -12,6 +12,7 @@ import fs from 'fs';
 import multer from 'multer';
 import sanitizeHtml from 'sanitize-html';
 import { extractTextFromFile } from './extractTextFromFile.js';
+import axios from 'axios'; // PRIDĖTA: Axios biblioteka paieškai
 
 // --- APLINKOS KONFIGŪRACIJA ---
 dotenv.config();
@@ -254,6 +255,67 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
     const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
+
+    // --- PRADŽIA: PAIEŠKOS LOGIKOS BLOKAS ---
+    const userPrompt = sanitizedMessage.trim();
+    const searchKeywords = ["ieškok", "parodyk internete", "search"];
+    
+    if (userPrompt && searchKeywords.some(keyword => userPrompt.toLowerCase().includes(keyword))) {
+        let convId = conversation_id;
+        const userUUID = req.session.userUuid;
+        let isNewConversation = false;
+
+        try {
+            if (!userUUID) {
+                return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
+            }
+
+            if (!convId || convId === 'null') {
+                isNewConversation = true;
+                const newConv = await pool.query(
+                    "INSERT INTO conversations (title, user_uuid) VALUES ($1, $2) RETURNING id",
+                    ["Paieška internete", userUUID]
+                );
+                convId = newConv.rows[0].id;
+            }
+
+            await pool.query(
+                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
+                [convId, userPrompt, userUUID]
+            );
+
+            const searchResults = await searchDuckDuckGo(userPrompt);
+
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
+
+            res.write(`data: ${JSON.stringify({ content: searchResults, conversation_id: convId })}\n\n`);
+
+            await pool.query(
+                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3)",
+                [convId, searchResults, userUUID]
+            );
+            await pool.query("UPDATE conversations SET updated_at = NOW() WHERE id = $1", [convId]);
+            
+            if (isNewConversation) {
+                 res.write(`data: ${JSON.stringify({ event: 'title_updated', title: "Paieška internete" })}\n\n`);
+            }
+
+            res.write('data: [DONE]\n\n');
+            return res.end();
+
+        } catch (error) {
+            console.error("Paieškos klaida:", error);
+            if (!res.headersSent) {
+                return res.status(500).json({ reply: "Nepavyko atlikti paieškos internete." });
+            }
+            res.end();
+        }
+        return; // Svarbu, kad sustabdytų vykdymą ir neitų prie GPT logikos
+    }
+    // --- PABAIGA: PAIEŠKOS LOGIKOS BLOKAS ---
 
     if (!sanitizedMessage && (!req.files || req.files.length === 0)) {
         return res.status(400).json({ reply: "Klaida: pranešimas ir failai negali būti tušti." });
@@ -539,6 +601,35 @@ app.post('/admin/unapprove', checkAuth, checkAdmin, bodyParser.urlencoded({ exte
 //======================================================================
 //  4. PAGALBINĖS FUNKCIJOS IR SERVERIO PALEIDIMAS
 //======================================================================
+
+async function searchDuckDuckGo(query) {
+    try {
+        // Išvalome paieškos raktažodžius iš pačios užklausos
+        const cleanQuery = query.toLowerCase().replace("ieškok", "").replace("parodyk internete", "").replace("search", "").trim();
+        const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&pretty=1&no_html=1&skip_disambig=1`);
+        
+        const mainAnswer = response.data.AbstractText;
+        const relatedTopics = response.data.RelatedTopics.filter(topic => topic.Text).slice(0, 4);
+
+        if (!mainAnswer && relatedTopics.length === 0) {
+            return "Atsiprašau, pagal jūsų užklausą internete nieko konkretaus rasti nepavyko.";
+        }
+
+        let resultText = "";
+        if (mainAnswer) {
+            resultText += `**Pagrindinis atsakymas:**\n${mainAnswer}\n\n`;
+        }
+        if (relatedTopics.length > 0) {
+            resultText += "**Susijusios temos:**\n";
+            resultText += relatedTopics.map(r => `- ${r.Text}`).join('\n');
+        }
+        
+        return resultText.trim();
+    } catch (error) {
+        console.error("DuckDuckGo paieškos klaida:", error.message);
+        return "Atsiprašome, įvyko klaida atliekant paiešką internete.";
+    }
+}
 
 const memoryTriggers = [
     "prisimink", "prisiminti", "isimink", "isiminti",
