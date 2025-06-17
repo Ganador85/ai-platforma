@@ -1,9 +1,7 @@
+/* Importuojame šriftą */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-* {
-  box-sizing: border-box;
-}
-
+/* Pagrindinės kintamieji */
 :root {
   --sidebar-width: 260px;
   --main-bg: #121212;
@@ -18,6 +16,11 @@
   --logout-hover-bg: #b71c1c;
 }
 
+/* Pagrindinis stilius */
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--main-bg);
@@ -27,9 +30,10 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  /* PAKEITIMAS: Svarbu, kad body neužimtų daugiau nei ekrano aukštis */
-  overflow: hidden; 
+  min-height: 100vh;
+  padding-top: env(safe-area-inset-top); /* Saugus plotas viršuje */
+  padding-bottom: env(safe-area-inset-bottom); /* Saugus plotas apačioje */
+  overflow-x: hidden;
 }
 
 .app-shell {
@@ -43,39 +47,40 @@ body {
   display: flex;
   overflow: hidden;
   position: relative;
+  margin-top: env(safe-area-inset-top);
+  margin-bottom: env(safe-area-inset-bottom);
 }
 
 #menu-toggle-btn {
-    display: none;
-    position: absolute;
-    top: 22px;
-    left: 15px;
-    /* PAKEITIMAS: Užtikriname, kad mygtukas visada viršuje */
-    z-index: 1001; 
-    background: transparent;
-    padding: 5px;
-    border: none;
+  display: none;
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 1002; /* Aukštesnis z-index, kad neuždengtų kitų elementų */
+  background: transparent;
+  padding: 8px;
+  border: none;
+  cursor: pointer;
 }
 
 #menu-toggle-btn:hover {
-    background-color: var(--hover-bg);
-    transform: none;
+  background-color: var(--hover-bg);
+  border-radius: 50%;
 }
 
 #overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    /* PAKEITIMAS: Overlay turi būti po sidebar, bet virš turinio */
-    z-index: 998; 
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 998;
 }
 
 body.sidebar-visible #overlay {
-    display: block;
+  display: block;
 }
 
 #history-sidebar {
@@ -87,9 +92,28 @@ body.sidebar-visible #overlay {
   justify-content: space-between;
   border-right: 1px solid var(--border-color);
   flex-shrink: 0;
-  transition: all 0.3s ease-in-out;
-  /* PAKEITIMAS: Sidebar turi būti aukščiausiame sluoksnyje */
-  z-index: 999; 
+  transition: transform 0.3s ease-in-out;
+  z-index: 1000;
+  position: relative;
+}
+
+body.sidebar-visible #history-sidebar {
+  transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+  #history-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transform: translateX(calc(-1 * var(--sidebar-width)));
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+  }
+
+  body.sidebar-visible #history-sidebar {
+    transform: translateX(0);
+  }
 }
 
 .sidebar-header {
@@ -142,26 +166,22 @@ body.sidebar-visible #overlay {
   color: #888;
   padding: 6px;
   cursor: pointer;
-  height: auto;
-  width: auto;
 }
 
-#search-form button:hover,
-#search-form button:active {
-  background: none;
+#search-form button:hover {
   color: white;
   transform: translateY(-50%) scale(1.1);
 }
 
 #search-form svg {
-    width: 18px;
-    height: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar-main-content {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 #history-list {
@@ -170,7 +190,8 @@ body.sidebar-visible #overlay {
   padding: 10px 0;
 }
 
-#history-list ul, #history-list li {
+#history-list ul,
+#history-list li {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -183,7 +204,8 @@ body.sidebar-visible #overlay {
   padding: 12px 20px;
   cursor: pointer;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-radius: 6px;
   margin: 2px 10px;
   transition: all 0.2s ease-in-out;
@@ -235,7 +257,6 @@ body.sidebar-visible #overlay {
 .history-item-actions button:hover {
   background-color: #4f4f4f;
   color: white;
-  transform: none;
 }
 
 .history-item-actions button.delete-btn:hover {
@@ -253,14 +274,13 @@ body.sidebar-visible #overlay {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px 30px 0 30px; 
+  padding: 25px 30px 0 30px;
   transition: background-color 0.2s;
-  /* PAKEITIMAS: Svarbu teisingam išdėstymui */
-  overflow: hidden; 
+  overflow-y: auto;
 }
 
 #chat-container.drag-over {
-    background-color: var(--hover-bg);
+  background-color: var(--hover-bg);
 }
 
 h1 {
@@ -290,10 +310,22 @@ h1 {
   gap: 10px;
 }
 
-#chat-box::-webkit-scrollbar { width: 8px; }
-#chat-box::-webkit-scrollbar-track { background: transparent; }
-#chat-box::-webkit-scrollbar-thumb { background-color: #333; border-radius: 4px; }
-#chat-box::-webkit-scrollbar-thumb:hover { background-color: #555; }
+#chat-box::-webkit-scrollbar {
+  width: 8px;
+}
+
+#chat-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#chat-box::-webkit-scrollbar-thumb {
+  background-color: #333;
+  border-radius: 4px;
+}
+
+#chat-box::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
 
 .user-message,
 .ai-message {
@@ -334,9 +366,18 @@ h1 {
   transition: all 0.2s ease-in-out;
 }
 
-.ai-message:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { background-color: rgba(255, 255, 255, 0.2); }
-.copy-btn svg { width: 16px; height: 16px; }
+.ai-message:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
 
 .error-message {
   background-color: var(--error-bg);
@@ -348,8 +389,7 @@ h1 {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  padding-top: 20px;
-  padding-bottom: 25px;
+  padding: 20px 0 25px 0;
 }
 
 .input-area {
@@ -404,7 +444,6 @@ h1 {
 .remove-file-btn:hover {
   background-color: var(--error-bg);
   color: white;
-  transform: none;
 }
 
 button {
@@ -417,8 +456,11 @@ button {
   transition: all 0.2s ease-in-out;
 }
 
-button:hover { transform: translateY(-2px); }
-button:active { 
+button:hover {
+  transform: translateY(-2px);
+}
+
+button:active {
   transform: translateY(0) scale(0.97);
   transition-duration: 0.05s;
 }
@@ -444,9 +486,9 @@ button:active {
 }
 
 .input-area button {
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
 }
 
 .input-area button[type="submit"] {
@@ -454,7 +496,9 @@ button:active {
   color: white;
 }
 
-.input-area button[type="submit"]:hover { background-color: #005fa3; }
+.input-area button[type="submit"]:hover {
+  background-color: #005fa3;
+}
 
 .secondary-btn {
   padding: 10px 16px;
@@ -467,7 +511,9 @@ button:active {
   justify-content: flex-start;
 }
 
-.secondary-btn:hover { background-color: var(--hover-bg); }
+.secondary-btn:hover {
+  background-color: var(--hover-bg);
+}
 
 .logout-btn:hover {
   background-color: var(--logout-hover-bg);
@@ -476,10 +522,10 @@ button:active {
 }
 
 .input-area .secondary-btn {
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
 }
 
 .history-item-edit-input {
@@ -493,13 +539,30 @@ button:active {
   font-size: 0.9rem;
 }
 
-.message-enter { animation: slideIn 0.4s ease-out; }
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(15px); }
-  to { opacity: 1; transform: translateY(0); }
+.message-enter {
+  animation: slideIn 0.4s ease-out;
 }
-.indicator-container { background-color: transparent; padding: 10px 18px; }
-.indicator-container img { width: 50px; height: auto; }
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.indicator-container {
+  background-color: transparent;
+  padding: 10px 18px;
+}
+
+.indicator-container img {
+  width: 50px;
+  height: auto;
+}
 
 @keyframes textShine {
   to {
@@ -508,53 +571,47 @@ button:active {
 }
 
 .sidebar-footer {
-    padding: 15px;
-    border-top: 1px solid var(--border-color);
+  padding: 15px;
+  border-top: 1px solid var(--border-color);
 }
 
-/* =========================================== */
-/* === MOBILIŲJŲ ĮRENGINIŲ PAKEITIMAI === */
-/* =========================================== */
-
+/* Mobilieji įrenginiai */
 @media (max-width: 768px) {
   .app-shell {
     width: 100%;
-    /* PAKEITIMAS: Naudojame 100% aukščio, kad užpildytų visą ekraną */
-    height: 100%; 
+    height: 100vh;
     max-height: none;
     border-radius: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  #menu-toggle-btn {
+    display: flex;
+    margin-left: 10px; /* Vieta naujam susirašinėjimui */
   }
 
   #history-sidebar {
-    position: fixed;
-    /* PAKEITIMAS: Skaičiavimas patikimesniam paslėpimui */
-    left: calc(-1 * var(--sidebar-width) - 2px);
-    top: 0;
-    height: 100%;
-    border-right: 1px solid var(--border-color);
-    box-shadow: 4px 0px 15px rgba(0,0,0,0.2);
-  }
-
-  body.sidebar-visible #history-sidebar {
-    left: 0;
+    margin-top: env(safe-area-inset-top);
   }
 
   #chat-container {
     padding: 15px;
     width: 100%;
-  }
-  
-  #chat-form {
-    padding: 10px 0 15px 0;
+    padding-bottom: 60px; /* Vieta klaviatūrai */
   }
 
   h1 {
     font-size: 1.2rem;
-    padding-left: 40px;
+    padding-left: 50px; /* Vieta meniu mygtukui */
     text-align: left;
   }
 
-  #menu-toggle-btn {
-    display: flex;
+  #user-input {
+    padding: 8px;
+  }
+
+  #chat-form {
+    padding: 10px 0 15px 0;
   }
 }
