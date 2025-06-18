@@ -256,9 +256,6 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
 // ======================================================================
 //  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
 // ======================================================================
-// ======================================================================
-//  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
-// ======================================================================
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
     const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
@@ -326,7 +323,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
                 try {
                     const extractedText = await extractTextFromFile(file.path, file.mimetype);
                     if (extractedText) {
-                        fileContext += `\n\n--- Dokumento "${file.originalname}" turinys ---\n${extractedText}\n--- Dokumento pabaiga ---`;
+                        fileContext += `\n\n--- Dokumento "<span class="math-inline">\{file\.originalname\}" turinys \-\-\-\\n</span>{extractedText}\n--- Dokumento pabaiga ---`;
                     }
                 } catch (extractError) {
                     console.error(`Nepavyko ištraukti teksto iš ${file.originalname}:`, extractError.message);
@@ -343,10 +340,10 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             "kokia šiandien diena", "kokia data", "kuri diena", "koks šiandien oras", "koks oras",
             "kiek kainuoja", "koks adresas", "kur įsikūrusi", "kas įkūrė",
             "kas buvo įkurta", "kur yra", "koks dydis", "kiek liko", "kiek žmonių",
-            "kokia prognozė", "kaip pasiekti", "kas rašo", "kas sakė", "kas sukūrė"
+            "kokia prognozė", "kaip pasiekti", "kas rašo", "kas sakė", "kas sukūrė",
+            "vakar", "šiandien", "neseniai", "ką tik", "šią savaitę", "naujausias", "naujienos apie"
         ];
         
-        // --- PRADŽIA: NAUJAS, IŠPLĖSTAS SISTEMINIS PRANEŠIMAS ---
         const systemSearchPrompt = `
 Tu esi pažangus AI pagalbininkas, kuris turi vienintelį tikslą – padėti vartotojui kuo tiksliau ir praktiškiau. 
 
@@ -372,14 +369,15 @@ Assistant: SEARCH: ar domenas clarivex.ai registruotas
 
 Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybės sužinoti – mandagiai paaiškink, kad informacija nepasiekiama net ir per paiešką.
 `;
-        // --- PABAIGA: NAUJAS, IŠPLĖSTAS SISTEMINIS PRANEŠIMAS ---
-
+        
         let searchNeeded = false;
         let searchQuery = "";
-        
+
         if (sanitizedMessage) {
             const promptLower = sanitizedMessage.toLowerCase();
-            if (searchKeywords.some(keyword => promptLower.includes(keyword))) {
+            const dateOrYearPattern = /\b(20\d{2})\b|\b(\d{1,2}\s+(sausis|vasaris|kovas|balandis|gegužė|birželis|liepa|rugpjūtis|rugsėjis|spalis|lapkritis|gruodis))\b/i;
+
+            if (searchKeywords.some(keyword => promptLower.includes(keyword)) || dateOrYearPattern.test(sanitizedMessage)) {
                 searchNeeded = true;
                 searchQuery = sanitizedMessage;
             } else {
@@ -473,6 +471,7 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
         }
     }
 });
+
 app.post("/search", checkAuth, async (req, res) => {
     const { query } = req.body;
     if (!query) {
@@ -550,13 +549,13 @@ app.get('/admin', checkAuth, checkAdmin, async (req, res) => {
 
             return `
                 <tr>
-                    <td>${user.id}</td>
-                    <td>${user.email}</td>
+                    <td><span class="math-inline">\{user\.id\}</td\>
+<td\></span>{user.email}</td>
                     <td>${new Date(user.created_at).toLocaleString('lt-LT')}</td>
                     <td style="font-weight: bold; color: ${user.is_approved ? 'green' : 'red'};">
-                        ${user.is_approved ? 'Patvirtintas' : 'Nepatvirtintas'}
-                    </td>
-                    <td>${actionForm}</td>
+                        <span class="math-inline">\{user\.is\_approved ? 'Patvirtintas' \: 'Nepatvirtintas'\}
+</td\>
+<td\></span>{actionForm}</td>
                 </tr>
             `;
         }).join('');
@@ -613,5 +612,5 @@ async function deleteConversation(conversationId) { const client = await pool.co
 async function generateAndSaveTitle(conversationId, userMessage, aiMessage) { try { const userPromptPart = userMessage ? `Vartotojas: "${userMessage}"` : 'Vartotojas įkėlė dokumentą analizei.'; const prompt = `Remdamasis šiuo pokalbiu, sugeneruok trumpą, 4-6 žodžių pavadinimą lietuvių kalba. Nenaudok kabučių.\n\n${userPromptPart}\nAsistentas: "${aiMessage.substring(0, 300)}..."\n\nPavadinimas:`; const response = await openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: prompt }], temperature: 0.5, max_tokens: 20, }); let newTitle = response.choices[0].message.content.trim().replace(/"/g, ''); if (newTitle) { await pool.query("UPDATE conversations SET title = $1 WHERE id = $2", [newTitle, conversationId]); console.log(`Sėkmingai atnaujintas pavadinimas pokalbiui ${conversationId}: ${newTitle}`); return newTitle; } } catch (error) { console.error("Klaida generuojant pavadinimą:", error.message); } return null; }
 
 app.listen(port, () => {
-  console.log(`Serveris veikia adresu: http://localhost:${port}`);
+  console.log(`Serveris veikia adresu: http://localhost:${port}`);
 });
