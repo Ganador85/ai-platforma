@@ -254,7 +254,7 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
 });
 
 // ======================================================================
-//  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
+//  PAGRINDINIS /ask MARŠRUTAS SU PATOBULINTA PAIEŠKOS LOGIKA (v1.5)
 // ======================================================================
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
@@ -269,7 +269,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const userUUID = req.session.userUuid;
 
     try {
-        console.log("--- PALEISTA GALUTINE KODO VERSIJA - v1.4 ---");
+        console.log("--- PALEISTA GALUTINE KODO VERSIJA - v1.5 ---");
         if (!userUUID) {
             return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
         }
@@ -324,7 +324,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
                 try {
                     const extractedText = await extractTextFromFile(file.path, file.mimetype);
                     if (extractedText) {
-                        fileContext += `\n\n--- Dokumento "<span class="math-inline">\{file\.originalname\}" turinys \-\-\-\\n</span>{extractedText}\n--- Dokumento pabaiga ---`;
+                        fileContext += `\n\n--- Dokumento "${file.originalname}" turinys ---\n${extractedText}\n--- Dokumento pabaiga ---`;
                     }
                 } catch (extractError) {
                     console.error(`Nepavyko ištraukti teksto iš ${file.originalname}:`, extractError.message);
@@ -332,81 +332,66 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
 
-        // --- PRADŽIA: "Neperšaunama" paieškos logika ---
-        
-        // Raktažodžiai parašyti be lietuviškų raidžių, kad veiktų su normalizuotu tekstu
-        const searchKeywords = [
-            "ieskok", "surask", "search", "parodyk internete", "rask informacija", "patikrink",
-            "ka zinai apie", "kas yra", "kas tai", "kas buvo", "kas vyksta", "ka reiskia", "papasakok apie",
-            "ar gali rasti", "paziurek", "ar egzistuoja", "kur rasti", "kas priklauso",
-            "domenas", "prekinis zenklas", "ar veikia", "ar laisvas domenas",
-            "kokia siandien diena", "kokia data", "kuri diena", "koks siandien oras", "koks oras",
-            "kiek kainuoja", "koks adresas", "kur isikurusi", "kas ikure", "kox", "ka",
-            "kas buvo ikurta", "kur yra", "koks dydis", "kiek liko", "kiek zmoniu",
-            "kokia prognoze", "kaip pasiekti", "kas raso", "kas sake", "kas sukure", "kiek",
-            "vakar", "siandien", "neseniai", "ka tik", "sia savaite", "naujausias", "naujienos apie"
-        ];
-        
-        const systemSearchPrompt = `
-Tu esi pažangus AI pagalbininkas, kuris turi vienintelį tikslą – padėti vartotojui kuo tiksliau ir praktiškiau. 
-Tavo pareiga – naudoti:
-– savo žinias ir loginį mąstymą;
-– visą pokalbių istoriją;
-– ilgalaikę vartotojo atmintį;
-– dokumentų turinį;
-– interneto paiešką (jei reikia).
-**Niekada nesakyk „neturiu galimybės“, „nežinau“ ar „negaliu“**, jei egzistuoja būdas tai sužinoti ar išspręsti per logiką, kontekstą ar paiešką. 
-Jei atsakymui reikia išorinių žinių (pvz., orai, datų atitikimas, domenų užimtumas, vieša informacija), tu turi pradėti atsakymą su:
-SEARCH: trumpa paieškos frazė
-Pavyzdžiai:
-User: Kokia diena bus birželio 20?
-Assistant: SEARCH: 2025 birželio 20 diena savaitės
-User: Ar domenas clarivex.ai laisvas?
-Assistant: SEARCH: ar domenas clarivex.ai registruotas
-Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybės sužinoti – mandagiai paaiškink, kad informacija nepasiekiama net ir per paiešką.
-`;
-        
+        // --- PRADŽIA: Pataisyta ir patikima paieškos logika ---
+
         let searchNeeded = false;
-        let searchQuery = "";
+        let searchQuery = sanitizedMessage; // Visada ieškome pagal originalią žinutę
 
         if (sanitizedMessage) {
-            // 1. Normalizuojame vartotojo įvestą tekstą (pašaliname lietuviškas raides, mažosios raidės)
             const normalizedMessage = normalize(sanitizedMessage);
 
-            // 2. Patobulintas datos atpažinimas, suprantantis skirtingus linksnius ir rašybą be LT raidžių
-            const dateOrYearPattern = /\b(20\d{2})\s*m?\.?\s*(?:saus|vasar|kov|baland|geguž|biržel|liep|rugpjū|rugsėj|spal|lapkri|gruod)(?:[a-z]*)\b|\b(\d{1,2})\s*(?:saus|vasar|kov|baland|geguž|biržel|liep|rugpjū|rugsėj|spal|lapkri|gruod)(?:[a-z]*)\b/i;
+            // Raktažodžiai be LT raidžių, skirti normalizuoto teksto tikrinimui
+            const searchKeywords = [
+                "ieskok", "surask", "search", "parodyk internete", "rask informacija", "patikrink",
+                "ka zinai apie", "kas yra", "kas tai", "kas buvo", "kas vyksta", "ka reiskia", "papasakok apie",
+                "ar gali rasti", "paziurek", "ar egzistuoja", "kur rasti", "kas priklauso",
+                "domenas", "prekinis zenklas", "ar veikia", "ar laisvas domenas",
+                "kokia siandien diena", "kokia data", "kuri diena", "koks siandien oras", "koks oras",
+                "kiek kainuoja", "koks adresas", "kur isikurusi", "kas ikure", "kox", "ka", "kiek",
+                "kas buvo ikurta", "kur yra", "koks dydis", "kiek liko", "kiek zmoniu",
+                "kokia prognoze", "kaip pasiekti", "kas raso", "kas sake", "kas sukure",
+                "vakar", "siandien", "rytoj", "neseniai", "ka tik", "sia savaite", "naujausias", "naujienos apie"
+            ];
 
-            // 3. Tikriname normalizuotą tekstą su normalizuotais raktažodžiais ir datos šablonu
-            if (searchKeywords.some(keyword => normalizedMessage.includes(keyword)) || dateOrYearPattern.test(normalizedMessage)) {
+            // Datos/metų šablonas be LT raidžių
+            const dateOrYearPattern = /\b(20\d{2})|\b(saus|vasar|kov|baland|geguz|birzel|liep|rugpjut|rugsej|spal|lapkr|gruod)/;
+
+            // Sudarome regex iš raktažodžių, kad ieškotų tikslių žodžių
+            const keywordRegex = new RegExp(`\\b(${searchKeywords.join('|')})\\b`);
+
+            // Tikriname, ar normalizuotoje žinutėje yra raktažodžių ARBA datos šablonas
+            if (keywordRegex.test(normalizedMessage) || dateOrYearPattern.test(normalizedMessage)) {
                 searchNeeded = true;
-                searchQuery = sanitizedMessage; // Paieškai siunčiame originalų tekstą
+                console.log("Paieška inicijuota pagal raktažodžius arba datą.");
             } else {
-                // Atsarginis variantas: jei niekas neatitiko, klausiame GPT nuomonės
+                // Jei raktažodžiai neatitinka, kaip atsarginį variantą naudojame GPT sprendimą
+                console.log("Raktažodžiai neatitiko, tikrinama su GPT...");
+                const systemSearchPrompt = `Ar atsakymui į šį klausimą reikalinga realaus laiko informacija iš interneto (pvz., naujienos, orai, datos, specifiniai faktai po 2023 m.)? Atsakyk TIK "TAIP" arba "NE". Klausimas: "${sanitizedMessage}"`;
                 const gptDecision = await openai.chat.completions.create({
                     model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: systemSearchPrompt },
-                        { role: "user", content: sanitizedMessage }
-                    ],
+                    messages: [{ role: "user", content: systemSearchPrompt }],
+                    max_tokens: 3,
+                    temperature: 0
                 });
-                const decisionText = gptDecision.choices[0].message.content;
-                if (decisionText.startsWith("SEARCH:")) {
+
+                const decisionText = gptDecision.choices[0].message.content.trim().toUpperCase();
+                console.log(`GPT sprendimas dėl paieškos: "${decisionText}"`);
+                if (decisionText.includes("TAIP")) {
                     searchNeeded = true;
-                    searchQuery = decisionText.replace("SEARCH:", "").trim();
                 }
             }
         }
-        // --- PABAIGA: "Neperšaunama" paieškos logika ---
+        // --- PABAIGA: Pataisyta ir patikima paieškos logika ---
 
         // --- Istorijos ir sistemos pranešimų paruošimas ---
         const messagesRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 AND content IS NOT NULL ORDER BY created_at ASC LIMIT 200", [convId]);
         const chatHistory = messagesRes.rows.map(row => ({ role: row.role, content: row.content }));
 
         if (fileContext) {
-            if (chatHistory.length === 0 || chatHistory[chatHistory.length - 1].role !== 'user') {
-                 chatHistory.push({ role: 'user', content: fileContext.trim() });
+            if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
+                chatHistory[chatHistory.length - 1].content += fileContext;
             } else {
-                 chatHistory[chatHistory.length - 1].content += fileContext;
+                chatHistory.push({ role: 'user', content: fileContext.trim() });
             }
         }
         
@@ -420,9 +405,10 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
 
         // --- Galutinės užklausos formavimas ir siuntimas į OpenAI ---
         if (searchNeeded) {
-            console.log(`Inicijuojama paieška su užklausa: "${searchQuery}"`);
+            console.log(`Inicijuojama interneto paieška su užklausa: "${searchQuery}"`);
             const searchResults = await searchSerpApi(searchQuery);
-            systemPrompt += `\n\nRemkis šia interneto paieškos informacija, kad atsakytum į vartotojo klausimą. Informacija: """${searchResults}"""`;
+            // Pridedame paieškos rezultatus į sistemos pranešimą, kad modelis jais remtųsi
+            systemPrompt += `\n\nŠtai interneto paieškos rezultatai, kuriais privalai remtis atsakydamas į vartotojo klausimą. Rezultatai: """${searchResults}"""`;
         }
 
         chatHistory.unshift({ role: "system", content: systemPrompt });
@@ -464,7 +450,8 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
         res.end();
 
     } catch (error) {
-        console.error("Klaida /ask maršrute:", error.message);
+        console.error("Klaida /ask maršrute:", error);
+        if (error.response) console.error("OpenAI API klaidos atsakymas:", error.response.data);
         if (!res.headersSent) {
             res.status(500).json({ reply: "Įvyko klaida. Bandykite vėliau." });
         } else {
@@ -472,6 +459,7 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
         }
     }
 });
+
 
 app.post("/search", checkAuth, async (req, res) => {
     const { query } = req.body;
@@ -537,13 +525,13 @@ app.get('/admin', checkAuth, checkAdmin, async (req, res) => {
             
             return `
                 <tr>
-                    <td><span class="math-inline">\{user\.id\}</td\>
-<td\></span>{user.email}</td>
+                    <td>${user.id}</td>
+                    <td>${user.email}</td>
                     <td>${new Date(user.created_at).toLocaleString('lt-LT')}</td>
                     <td style="font-weight: bold; color: ${user.is_approved ? 'green' : 'red'};">
-                        <span class="math-inline">\{user\.is\_approved ? 'Patvirtintas' \: 'Nepatvirtintas'\}
-</td\>
-<td\></span>{actionForm}</td>
+                        ${user.is_approved ? 'Patvirtintas' : 'Nepatvirtintas'}
+                    </td>
+                    <td>${actionForm}</td>
                 </tr>
             `;
         }).join('');
