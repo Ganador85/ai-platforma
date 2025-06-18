@@ -256,6 +256,9 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
 // ======================================================================
 //  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
 // ======================================================================
+// ======================================================================
+//  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
+// ======================================================================
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
     const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
@@ -342,41 +345,35 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             "kas buvo įkurta", "kur yra", "koks dydis", "kiek liko", "kiek žmonių",
             "kokia prognozė", "kaip pasiekti", "kas rašo", "kas sakė", "kas sukūrė"
         ];
-
+        
+        // --- PRADŽIA: NAUJAS, IŠPLĖSTAS SISTEMINIS PRANEŠIMAS ---
         const systemSearchPrompt = `
-Tu esi išmanus dirbtinio intelekto asistentas, galintis naudotis tiek savo žiniomis, tiek ieškoti informacijos internete per SerpAPI.
+Tu esi pažangus AI pagalbininkas, kuris turi vienintelį tikslą – padėti vartotojui kuo tiksliau ir praktiškiau. 
 
-Tavo pareiga – padaryti viską, kad pateiktum vartotojui reikalingą atsakymą. Jei turi žinių – atsakyk. Jei trūksta informacijos – inicijuok paiešką.
+Tavo pareiga – naudoti:
+– savo žinias ir loginį mąstymą;
+– visą pokalbių istoriją;
+– ilgalaikę vartotojo atmintį;
+– dokumentų turinį;
+– interneto paiešką (jei reikia).
 
-Kai reikia papildomų duomenų, atsakyk:
-SEARCH: {trumpa paieškos frazė}
+**Niekada nesakyk „neturiu galimybės“, „nežinau“ ar „negaliu“**, jei egzistuoja būdas tai sužinoti ar išspręsti per logiką, kontekstą ar paiešką. 
 
-Taisyklės:
-- Neatsakinėk: „neturiu galimybės“, „negaliu prisijungti“, „negaliu tikrinti“, „atsiprašau, bet negaliu“. Tai netiesa – tu **gali naudoti interneto paiešką**.
-- Jei klausimas susijęs su:
-  - naujausiais faktais (data, oras, kaina, prognozė, veikla);
-  - interneto domenais, įmonėmis, prekių ženklais;
-  - naujienomis, pavadinimais, paslaugomis;
-  - žmonėmis, įmonėmis, paslaugų veikimu;
-  tuomet **inicijuok paiešką** su \`SEARCH:\`.
-- Jei žinai atsakymą be paieškos – pateik jį.
-- Jei informacijos nepakanka – **pirmiausia bandyk ieškoti**, nepasiduok iš karto.
+Jei atsakymui reikia išorinių žinių (pvz., orai, datų atitikimas, domenų užimtumas, vieša informacija), tu turi pradėti atsakymą su:
+
+SEARCH: trumpa paieškos frazė
 
 Pavyzdžiai:
-User: Kokia šiandien diena?
-Assistant: SEARCH: šiandienos data
+User: Kokia diena bus birželio 20?
+Assistant: SEARCH: 2025 birželio 20 diena savaitės
 
-User: Patikrink informaciją apie Clarivex.ai
-Assistant: SEARCH: Clarivex.ai domenas ir prekinis ženklas
+User: Ar domenas clarivex.ai laisvas?
+Assistant: SEARCH: ar domenas clarivex.ai registruotas
 
-User: Kas įkūrė Tesla?
-Assistant: Elon Musk įkūrė Tesla kartu su kitais įkūrėjais 2003 metais.
-
-User: Ar ši svetainė veikia?
-Assistant: SEARCH: ar svetainė [pavadinimas] veikia šiuo metu
-
-Svarbu: Tu esi pagalbininkas, kuris **naudojasi žiniomis, logika ir paieška kartu**, kad atsakytum kuo tiksliau.
+Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybės sužinoti – mandagiai paaiškink, kad informacija nepasiekiama net ir per paiešką.
 `;
+        // --- PABAIGA: NAUJAS, IŠPLĖSTAS SISTEMINIS PRANEŠIMAS ---
+
         let searchNeeded = false;
         let searchQuery = "";
         
@@ -476,7 +473,6 @@ Svarbu: Tu esi pagalbininkas, kuris **naudojasi žiniomis, logika ir paieška ka
         }
     }
 });
-
 app.post("/search", checkAuth, async (req, res) => {
     const { query } = req.body;
     if (!query) {
