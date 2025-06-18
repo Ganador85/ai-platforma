@@ -374,7 +374,7 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
             const normalizedMessage = normalize(sanitizedMessage);
 
             // 2. Patobulintas datos atpažinimas, suprantantis skirtingus linksnius ir rašybą be LT raidžių
-            const dateOrYearPattern = /\b(20\d{2})\b|\b(\d{1,2})\s*m?\.?\s*(sausi(s|o|u)|vasari(s|o|u)|kov(as|o|a)|baland(is|i|žio)|gegu(ž|z)(e|ė|es)|bir(ž|z)el(is|io|i)|liep(a|os)|rugpj(ū|u)(t|c|č)(is|io)|rugs(ė|e)j(is|o|i)|spal(is|io|i)|lapkri(t|c|č)(is|io)|gruod(is|žio|i))\b/i;
+            const dateOrYearPattern = /\b(20\d{2})\s*m?\.?\s*(?:saus|vasar|kov|baland|geguž|biržel|liep|rugpjū|rugsėj|spal|lapkri|gruod)(?:[a-z]*)\b|\b(\d{1,2})\s*(?:saus|vasar|kov|baland|geguž|biržel|liep|rugpjū|rugsėj|spal|lapkri|gruod)(?:[a-z]*)\b/i;
 
             // 3. Tikriname normalizuotą tekstą su normalizuotais raktažodžiais ir datos šablonu
             if (searchKeywords.some(keyword => normalizedMessage.includes(keyword)) || dateOrYearPattern.test(normalizedMessage)) {
