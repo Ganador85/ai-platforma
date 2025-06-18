@@ -251,9 +251,8 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
         res.status(500).json({ error: "Serverio klaida įkeliant failą." });
     }
 });
-
 // ======================================================================
-//  PAGRINDINIS /ask MARŠRUTAS (v1.7 - Patikimiausias)
+//  PAGRINDINIS /ask MARŠRUTAS (Galutinė versija, pagal v1.6 logiką)
 // ======================================================================
 app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const { message, conversation_id } = req.body;
@@ -268,18 +267,17 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const userUUID = req.session.userUuid;
 
     try {
-        console.log("--- PALEISTA KODO VERSIJA - v1.7 ---");
+        console.log("--- PALEISTA GALUTINĖ KODO VERSIJA (STABILI) ---");
         if (!userUUID) {
             return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
         }
 
         if (isMemoryCommand(sanitizedMessage)) {
+            // ... atminties komandų logika lieka nepakitusi ...
             const infoToRemember = extractMemoryContent(sanitizedMessage);
             if (infoToRemember) {
                 await updateUserMemory(userUUID, infoToRemember);
                 res.setHeader('Content-Type', 'text/event-stream');
-                res.setHeader('Cache-Control', 'no-cache');
-                res.setHeader('Connection', 'keep-alive');
                 res.flushHeaders();
                 res.write(`data: ${JSON.stringify({ content: "Gerai, įsiminiau.", conversation_id: convId })}\n\n`);
                 res.write('data: [DONE]\n\n');
@@ -300,25 +298,38 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             convId = newConv.rows[0].id;
         }
 
-        // --- NAUJA LOGIKA: PAIEŠKOS REZULTATAI ĮTRAUKIAMI Į POKALBIO ISTORIJĄ ---
+        // 1. Išsaugome vartotojo žinutę Į DUOMENŲ BAZĘ
+        if (sanitizedMessage) {
+            await pool.query(
+                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
+                [convId, sanitizedMessage, userUUID]
+            );
+        }
         
-        // Gauname pradinę pokalbių istoriją
-        const messagesRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 AND content IS NOT NULL ORDER BY created_at ASC LIMIT 200", [convId]);
-        const chatHistory = messagesRes.rows.map(row => ({ role: row.role, content: row.content }));
-
-        // Pridedame failų kontekstą (jei yra) prie paskutinės vartotojo žinutės istorijoje
+        // Failų apdorojimas ir išsaugojimas (jei yra)
         let fileContext = "";
         if (req.files && req.files.length > 0) {
-            // ... (failų apdorojimo logika lieka ta pati)
-        }
-        if (fileContext) {
-            if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
-                chatHistory[chatHistory.length - 1].content += fileContext;
-            } else {
-                 chatHistory.push({ role: 'user', content: fileContext.trim() });
+            for (const file of req.files) {
+                // ... (failų apdorojimo ir įrašymo į DB logika)
+                const extractedText = await extractTextFromFile(file.path, file.mimetype);
+                if (extractedText) {
+                    fileContext += `\n\n--- Dokumento "${file.originalname}" turinys ---\n${extractedText}\n--- Dokumento pabaiga ---`;
+                }
+            }
+            // Jei buvo failų, jų turinį išsaugome kaip atskirą vartotojo pranešimą
+            if(fileContext) {
+                 await pool.query(
+                    "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
+                    [convId, `Prisegtų failų turinys:\n${fileContext}`, userUUID]
+                 );
             }
         }
+
+        // 2. Gauname VISĄ pokalbio istoriją (įskaitant ką tik pridėtą žinutę)
+        const historyRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC", [convId]);
+        const chatHistory = historyRes.rows.map(row => ({ role: row.role, content: row.content }));
         
+        // 3. Nustatome, ar reikia paieškos
         let searchNeeded = false;
         if (sanitizedMessage) {
             const normalizedMessage = normalize(sanitizedMessage);
@@ -328,52 +339,34 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
 
             if (keywordRegex.test(normalizedMessage) || dateOrYearPattern.test(normalizedMessage)) {
                 searchNeeded = true;
-            } else {
-                const systemSearchPrompt = `Ar atsakymui į šį klausimą reikalinga realaus laiko informacija iš interneto? Atsakyk TIK "TAIP" arba "NE". Klausimas: "${sanitizedMessage}"`;
-                const gptDecision = await openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: systemSearchPrompt }], max_tokens: 3, temperature: 0 });
-                if (gptDecision.choices[0].message.content.trim().toUpperCase().includes("TAIP")) {
-                    searchNeeded = true;
-                }
             }
         }
 
+        // 4. Paruošiame sistemos pranešimą (systemPrompt)
+        const memoryContent = await getUserMemory(userUUID);
+        const systemPromptRes = await pool.query("SELECT a.system_prompt FROM assistants a JOIN conversations c ON a.id = c.assistant_id WHERE c.id = $1", [convId]);
+        let systemPrompt = systemPromptRes.rows[0]?.system_prompt || "Tu esi draugiškas AI pagalbininkas.";
+        if (memoryContent) {
+            systemPrompt += `\n\nIlgalaikė atmintis apie vartotoją: ${memoryContent}`;
+        }
+
+        // 5. Jei reikia, PAPILDOME systemPrompt paieškos rezultatais (JŪSŲ SIŪLYTAS TEISINGAS BŪDAS)
         if (searchNeeded) {
             console.log(`Inicijuojama interneto paieška su užklausa: "${sanitizedMessage}"`);
             const searchResults = await searchSerpApi(sanitizedMessage);
 
-            let searchContextMessage;
             if (searchResults && searchResults.trim() !== "" && !searchResults.toLowerCase().includes("no results found")) {
-                searchContextMessage = `Prieš atsakydamas į vartotojo klausimą, pateikiu jam rastą informaciją internete. Interneto paieškos rezultatai: """${searchResults}"""`;
+                 systemPrompt += `\n\nSVARBU: Remkis TIK šia realaus laiko interneto paieškos informacija, kad atsakytum į paskutinį vartotojo klausimą. Informacija: """${searchResults}"""`;
             } else {
-                searchContextMessage = `Atlikau interneto paiešką pagal vartotojo užklausą, tačiau reikiamos informacijos rasti nepavyko.`;
+                systemPrompt += `\n\nSVARBI INSTRUKCIJA: Buvo atlikta interneto paieška pagal paskutinį vartotojo klausimą, tačiau jokių rezultatų nerasta. Informuok vartotoją aiškiai ir tiesiai, kad internete informacijos šia tema rasti nepavyko. Jokiu būdu nesiremk savo senomis žiniomis ir nesakyk, kad jos ribotos.`;
             }
-            // Įdedame paieškos rezultatus kaip asistento žinutę į istorijos vidurį
-            chatHistory.push({ role: 'assistant', content: searchContextMessage });
         }
         
-        // Įrašome TIKRĄJĄ vartotojo žinutę į DB ir pridedame ją į istorijos pabaigą
-        if (sanitizedMessage) {
-            await pool.query(
-                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'user', $2, $3)",
-                [convId, sanitizedMessage, userUUID]
-            );
-            chatHistory.push({ role: 'user', content: sanitizedMessage });
-        }
-
-        // Paruošiame sistemos pranešimą (dabar jis trumpas ir aiškus)
-        const memoryContent = await getUserMemory(userUUID);
-        const systemPromptRes = await pool.query("SELECT a.system_prompt FROM assistants a JOIN conversations c ON a.id = c.assistant_id WHERE c.id = $1", [convId]);
-        let systemPrompt = systemPromptRes.rows[0]?.system_prompt || "Tu esi draugiškas AI pagalbininkas.";
-        if (memoryContent && memoryContent.trim() !== '') {
-            systemPrompt += `\n\nTai yra ilgalaikė informacija apie vartotoją, į kurią privalai atsižvelgti: ${memoryContent}`;
-        }
-        
+        // 6. Suformuojame galutinę užklausą
         const finalMessages = [{ role: "system", content: systemPrompt }, ...chatHistory];
         
-        // Toliau viskas kaip įprasta - siunčiame užklausą į OpenAI
+        // 7. Siunčiame užklausą ir apdorojame atsakymą
         res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
         const completionStream = await openai.chat.completions.create({ model: "gpt-4o", messages: finalMessages, stream: true });
@@ -387,6 +380,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
         
+        // 8. Išsaugome AI atsakymą ir atnaujiname pokalbį
         if (fullReply) {
             await pool.query(
                 "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3)",
@@ -394,7 +388,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             );
             await pool.query("UPDATE conversations SET updated_at = NOW() WHERE id = $1", [convId]);
 
-            if (isNewConversation && (sanitizedMessage || (req.files && req.files.length > 0))) {
+            if (isNewConversation) {
                 const newTitle = await generateAndSaveTitle(convId, sanitizedMessage, fullReply);
                 if (newTitle) {
                     res.write(`data: ${JSON.stringify({ event: 'title_updated', title: newTitle })}\n\n`);
@@ -407,7 +401,6 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
 
     } catch (error) {
         console.error("Klaida /ask maršrute:", error);
-        if (error.response) console.error("OpenAI API klaidos atsakymas:", error.response.data);
         if (!res.headersSent) {
             res.status(500).json({ reply: "Įvyko klaida. Bandykite vėliau." });
         } else {
