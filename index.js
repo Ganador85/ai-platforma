@@ -252,6 +252,7 @@ app.post("/upload", checkAuth, upload.single('document'), async (req, res) => {
         res.status(500).json({ error: "Serverio klaida įkeliant failą." });
     }
 });
+
 // ======================================================================
 //  PAGRINDINIS /ask MARŠRUTAS SU NAUJA PAIEŠKOS LOGIKA
 // ======================================================================
@@ -330,35 +331,76 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
 
-        // --- Paieškos logika ---
+        // --- PRADŽIA: Atnaujinta paieškos logika ---
         const searchKeywords = [
-            "ieškok", "parodyk internete", "search", "surask",
-            "ką žinai apie", "kas yra", "papasakok apie", "trumpai apie",
-            "ka žinai apie", "kas tai", "kas buvo", "kas vyksta", "ką reiškia"
+            "ieškok", "surask", "search", "parodyk internete", "rask informaciją", "patikrink",
+            "ką žinai apie", "kas yra", "kas tai", "kas buvo", "kas vyksta", "ką reiškia", "papasakok apie",
+            "ar gali rasti", "pažiūrėk", "ar egzistuoja", "kur rasti", "kas priklauso",
+            "domenas", "prekinis ženklas", "ar veikia", "ar laisvas domenas",
+            "kokia šiandien diena", "kokia data", "kuri diena", "koks šiandien oras", "koks oras",
+            "kiek kainuoja", "koks adresas", "kur įsikūrusi", "kas įkūrė",
+            "kas buvo įkurta", "kur yra", "koks dydis", "kiek liko", "kiek žmonių",
+            "kokia prognozė", "kaip pasiekti", "kas rašo", "kas sakė", "kas sukūrė"
         ];
-        const systemSearchPrompt = `Tu esi pagalbininkas, kuris moka naudotis interneto paieška. Jei gali atsakyti pats – atsakyk į klausimą kaip visada. Jei negali atsakyti, bet klausimas reikalauja paieškos, atsakyk taip: SEARCH: trumpa paieškos frazė. Pavyzdžiai: User: Kas yra Sintra.ai? Assistant: SEARCH: Sintra.ai AI platforma. User: Koks šiandien oras Londone? Assistant: SEARCH: orai Londone šiandien. User: Kaip iškepti pyragą? Assistant: Galiu tau paaiškinti – pirmiausia reikės miltų, kiaušinių... Svarbu: niekada nerašyk „Atsiprašau, aš nežinau“. Jei reikia – inicijuok paiešką.`;
 
+        const systemSearchPrompt = `
+Tu esi išmanus dirbtinio intelekto asistentas, galintis naudotis tiek savo žiniomis, tiek ieškoti informacijos internete per SerpAPI.
+
+Tavo pareiga – padaryti viską, kad pateiktum vartotojui reikalingą atsakymą. Jei turi žinių – atsakyk. Jei trūksta informacijos – inicijuok paiešką.
+
+Kai reikia papildomų duomenų, atsakyk:
+SEARCH: {trumpa paieškos frazė}
+
+Taisyklės:
+- Neatsakinėk: „neturiu galimybės“, „negaliu prisijungti“, „negaliu tikrinti“, „atsiprašau, bet negaliu“. Tai netiesa – tu **gali naudoti interneto paiešką**.
+- Jei klausimas susijęs su:
+  - naujausiais faktais (data, oras, kaina, prognozė, veikla);
+  - interneto domenais, įmonėmis, prekių ženklais;
+  - naujienomis, pavadinimais, paslaugomis;
+  - žmonėmis, įmonėmis, paslaugų veikimu;
+  tuomet **inicijuok paiešką** su \`SEARCH:\`.
+- Jei žinai atsakymą be paieškos – pateik jį.
+- Jei informacijos nepakanka – **pirmiausia bandyk ieškoti**, nepasiduok iš karto.
+
+Pavyzdžiai:
+User: Kokia šiandien diena?
+Assistant: SEARCH: šiandienos data
+
+User: Patikrink informaciją apie Clarivex.ai
+Assistant: SEARCH: Clarivex.ai domenas ir prekinis ženklas
+
+User: Kas įkūrė Tesla?
+Assistant: Elon Musk įkūrė Tesla kartu su kitais įkūrėjais 2003 metais.
+
+User: Ar ši svetainė veikia?
+Assistant: SEARCH: ar svetainė [pavadinimas] veikia šiuo metu
+
+Svarbu: Tu esi pagalbininkas, kuris **naudojasi žiniomis, logika ir paieška kartu**, kad atsakytum kuo tiksliau.
+`;
         let searchNeeded = false;
         let searchQuery = "";
-        const promptLower = sanitizedMessage.toLowerCase();
-
-        if (sanitizedMessage && searchKeywords.some(keyword => promptLower.includes(keyword))) {
-            searchNeeded = true;
-            searchQuery = sanitizedMessage;
-        } else if (sanitizedMessage) {
-            const gptDecision = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: systemSearchPrompt },
-                    { role: "user", content: sanitizedMessage }
-                ],
-            });
-            const decisionText = gptDecision.choices[0].message.content;
-            if (decisionText.startsWith("SEARCH:")) {
+        
+        if (sanitizedMessage) {
+            const promptLower = sanitizedMessage.toLowerCase();
+            if (searchKeywords.some(keyword => promptLower.includes(keyword))) {
                 searchNeeded = true;
-                searchQuery = decisionText.replace("SEARCH:", "").trim();
+                searchQuery = sanitizedMessage;
+            } else {
+                const gptDecision = await openai.chat.completions.create({
+                    model: "gpt-4o",
+                    messages: [
+                        { role: "system", content: systemSearchPrompt },
+                        { role: "user", content: sanitizedMessage }
+                    ],
+                });
+                const decisionText = gptDecision.choices[0].message.content;
+                if (decisionText.startsWith("SEARCH:")) {
+                    searchNeeded = true;
+                    searchQuery = decisionText.replace("SEARCH:", "").trim();
+                }
             }
         }
+        // --- PABAIGA: Atnaujinta paieškos logika ---
 
         // --- Istorijos ir sistemos pranešimų paruošimas ---
         const messagesRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 AND content IS NOT NULL ORDER BY created_at ASC LIMIT 200", [convId]);
@@ -407,8 +449,8 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
         
         // --- Atsakymo išsaugojimas ir pabaigos veiksmai ---
         if (fullReply) {
-            const inserted = await pool.query(
-                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3) RETURNING id",
+            await pool.query(
+                "INSERT INTO messages (conversation_id, role, content, user_uuid) VALUES ($1, 'assistant', $2, $3)",
                 [convId, fullReply, userUUID]
             );
 
@@ -434,6 +476,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
         }
     }
 });
+
 app.post("/search", checkAuth, async (req, res) => {
     const { query } = req.body;
     if (!query) {
@@ -495,17 +538,17 @@ app.get('/admin', checkAuth, checkAdmin, async (req, res) => {
             let actionForm;
             if (user.is_approved) {
                 actionForm = `
-                    <form action="/admin/unapprove" method="POST" style="display:inline-block;">
-                        <input type="hidden" name="userId" value="${user.id}">
-                        <button type="submit" class="unapprove-btn" onclick="return confirm('Ar tikrai norite atšaukti šio vartotojo patvirtinimą? Jis nebegalės prisijungti.');">Atšaukti patvirtinimą</button>
-                    </form>
+                        <form action="/admin/unapprove" method="POST" style="display:inline-block;">
+                            <input type="hidden" name="userId" value="${user.id}">
+                            <button type="submit" class="unapprove-btn" onclick="return confirm('Ar tikrai norite atšaukti šio vartotojo patvirtinimą? Jis nebegalės prisijungti.');">Atšaukti patvirtinimą</button>
+                        </form>
                 `;
             } else {
                 actionForm = `
-                    <form action="/admin/approve" method="POST" style="display:inline-block;">
-                        <input type="hidden" name="userId" value="${user.id}">
-                        <button type="submit" class="approve-btn">Patvirtinti</button>
-                    </form>
+                        <form action="/admin/approve" method="POST" style="display:inline-block;">
+                            <input type="hidden" name="userId" value="${user.id}">
+                            <button type="submit" class="approve-btn">Patvirtinti</button>
+                        </form>
                 `;
             }
 
