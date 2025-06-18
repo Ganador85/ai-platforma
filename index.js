@@ -269,6 +269,7 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
     const userUUID = req.session.userUuid;
 
     try {
+        console.log("--- PALEISTA GALUTINE KODO VERSIJA - v1.4 ---");
         if (!userUUID) {
             return res.status(401).json({ error: "Vartotojas neautentifikuotas arba sesija baigėsi." });
         }
@@ -331,42 +332,37 @@ app.post("/ask", checkAuth, upload.array('documents', 5), async (req, res) => {
             }
         }
 
-        // --- PRADŽIA: Atnaujinta paieškos logika ---
+        // --- PRADŽIA: "Neperšaunama" paieškos logika ---
+        
+        // Raktažodžiai parašyti be lietuviškų raidžių, kad veiktų su normalizuotu tekstu
         const searchKeywords = [
-            "ieškok", "surask", "search", "parodyk internete", "rask informaciją", "patikrink",
-            "ką žinai apie", "kas yra", "kas tai", "kas buvo", "kas vyksta", "ką reiškia", "papasakok apie",
-            "ar gali rasti", "pažiūrėk", "ar egzistuoja", "kur rasti", "kas priklauso",
-            "domenas", "prekinis ženklas", "ar veikia", "ar laisvas domenas",
-            "kokia šiandien diena", "kokia data", "kuri diena", "koks šiandien oras", "koks oras",
-            "kiek kainuoja", "koks adresas", "kur įsikūrusi", "kas įkūrė",
-            "kas buvo įkurta", "kur yra", "koks dydis", "kiek liko", "kiek žmonių",
-            "kokia prognozė", "kaip pasiekti", "kas rašo", "kas sakė", "kas sukūrė",
-            "vakar", "šiandien", "neseniai", "ką tik", "šią savaitę", "naujausias", "naujienos apie"
+            "ieskok", "surask", "search", "parodyk internete", "rask informacija", "patikrink",
+            "ka zinai apie", "kas yra", "kas tai", "kas buvo", "kas vyksta", "ka reiskia", "papasakok apie",
+            "ar gali rasti", "paziurek", "ar egzistuoja", "kur rasti", "kas priklauso",
+            "domenas", "prekinis zenklas", "ar veikia", "ar laisvas domenas",
+            "kokia siandien diena", "kokia data", "kuri diena", "koks siandien oras", "koks oras",
+            "kiek kainuoja", "koks adresas", "kur isikurusi", "kas ikure", "kox", "ka",
+            "kas buvo ikurta", "kur yra", "koks dydis", "kiek liko", "kiek zmoniu",
+            "kokia prognoze", "kaip pasiekti", "kas raso", "kas sake", "kas sukure", "kiek",
+            "vakar", "siandien", "neseniai", "ka tik", "sia savaite", "naujausias", "naujienos apie"
         ];
         
         const systemSearchPrompt = `
 Tu esi pažangus AI pagalbininkas, kuris turi vienintelį tikslą – padėti vartotojui kuo tiksliau ir praktiškiau. 
-
 Tavo pareiga – naudoti:
 – savo žinias ir loginį mąstymą;
 – visą pokalbių istoriją;
 – ilgalaikę vartotojo atmintį;
 – dokumentų turinį;
 – interneto paiešką (jei reikia).
-
 **Niekada nesakyk „neturiu galimybės“, „nežinau“ ar „negaliu“**, jei egzistuoja būdas tai sužinoti ar išspręsti per logiką, kontekstą ar paiešką. 
-
 Jei atsakymui reikia išorinių žinių (pvz., orai, datų atitikimas, domenų užimtumas, vieša informacija), tu turi pradėti atsakymą su:
-
 SEARCH: trumpa paieškos frazė
-
 Pavyzdžiai:
 User: Kokia diena bus birželio 20?
 Assistant: SEARCH: 2025 birželio 20 diena savaitės
-
 User: Ar domenas clarivex.ai laisvas?
 Assistant: SEARCH: ar domenas clarivex.ai registruotas
-
 Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybės sužinoti – mandagiai paaiškink, kad informacija nepasiekiama net ir per paiešką.
 `;
         
@@ -374,13 +370,18 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
         let searchQuery = "";
 
         if (sanitizedMessage) {
-            const promptLower = sanitizedMessage.toLowerCase();
-            const dateOrYearPattern = /\b(20\d{2})\b|\b(\d{1,2}\s+(sausis|vasaris|kovas|balandis|gegužė|birželis|liepa|rugpjūtis|rugsėjis|spalis|lapkritis|gruodis))\b/i;
+            // 1. Normalizuojame vartotojo įvestą tekstą (pašaliname lietuviškas raides, mažosios raidės)
+            const normalizedMessage = normalize(sanitizedMessage);
 
-            if (searchKeywords.some(keyword => promptLower.includes(keyword)) || dateOrYearPattern.test(sanitizedMessage)) {
+            // 2. Patobulintas datos atpažinimas, suprantantis skirtingus linksnius ir rašybą be LT raidžių
+            const dateOrYearPattern = /\b(20\d{2})\b|\b(\d{1,2})\s*m?\.?\s*(sausi(s|o|u)|vasari(s|o|u)|kov(as|o|a)|baland(is|i|žio)|gegu(ž|z)(e|ė|es)|bir(ž|z)el(is|io|i)|liep(a|os)|rugpj(ū|u)(t|c|č)(is|io)|rugs(ė|e)j(is|o|i)|spal(is|io|i)|lapkri(t|c|č)(is|io)|gruod(is|žio|i))\b/i;
+
+            // 3. Tikriname normalizuotą tekstą su normalizuotais raktažodžiais ir datos šablonu
+            if (searchKeywords.some(keyword => normalizedMessage.includes(keyword)) || dateOrYearPattern.test(normalizedMessage)) {
                 searchNeeded = true;
-                searchQuery = sanitizedMessage;
+                searchQuery = sanitizedMessage; // Paieškai siunčiame originalų tekstą
             } else {
+                // Atsarginis variantas: jei niekas neatitiko, klausiame GPT nuomonės
                 const gptDecision = await openai.chat.completions.create({
                     model: "gpt-4o",
                     messages: [
@@ -395,7 +396,7 @@ Tavo misija – **bandyti viską**, kad padėtum. Tik jei nėra jokios galimybė
                 }
             }
         }
-        // --- PABAIGA: Atnaujinta paieškos logika ---
+        // --- PABAIGA: "Neperšaunama" paieškos logika ---
 
         // --- Istorijos ir sistemos pranešimų paruošimas ---
         const messagesRes = await pool.query("SELECT role, content FROM messages WHERE conversation_id = $1 AND content IS NOT NULL ORDER BY created_at ASC LIMIT 200", [convId]);
@@ -530,23 +531,10 @@ app.get('/admin', checkAuth, checkAdmin, async (req, res) => {
         const users = result.rows;
 
         let userListHtml = users.map(user => {
-            let actionForm;
-            if (user.is_approved) {
-                actionForm = `
-                        <form action="/admin/unapprove" method="POST" style="display:inline-block;">
-                            <input type="hidden" name="userId" value="${user.id}">
-                            <button type="submit" class="unapprove-btn" onclick="return confirm('Ar tikrai norite atšaukti šio vartotojo patvirtinimą? Jis nebegalės prisijungti.');">Atšaukti patvirtinimą</button>
-                        </form>
-                `;
-            } else {
-                actionForm = `
-                        <form action="/admin/approve" method="POST" style="display:inline-block;">
-                            <input type="hidden" name="userId" value="${user.id}">
-                            <button type="submit" class="approve-btn">Patvirtinti</button>
-                        </form>
-                `;
-            }
-
+            const actionForm = user.is_approved
+              ? `<form action="/admin/unapprove" method="POST" style="display:inline-block;"><input type="hidden" name="userId" value="${user.id}"><button type="submit" class="unapprove-btn" onclick="return confirm('Ar tikrai norite atšaukti šio vartotojo patvirtinimą? Jis nebegalės prisijungti.');">Atšaukti patvirtinimą</button></form>`
+              : `<form action="/admin/approve" method="POST" style="display:inline-block;"><input type="hidden" name="userId" value="${user.id}"><button type="submit" class="approve-btn">Patvirtinti</button></form>`;
+            
             return `
                 <tr>
                     <td><span class="math-inline">\{user\.id\}</td\>
@@ -603,7 +591,22 @@ app.post('/admin/unapprove', checkAuth, checkAdmin, bodyParser.urlencoded({ exte
 //======================================================================
 
 const memoryTriggers = [ "prisimink", "prisiminti", "isimink", "isiminti", "issaugok", "issaugoti", "isirasyk", "irasik", "atsimink", "uzfiksuok", "turek omenyje", "atmink" ];
-function normalize(text) { if (!text) return ""; return text.toLowerCase().replace(/ą/g, "a").replace(/č/g, "c").replace(/ę/g, "e").replace(/ė/g, "e").replace(/į/g, "i").replace(/š/g, "s").replace(/ų/g, "u").replace(/ū/g, "u").replace(/ž/g, "z"); }
+
+function normalize(text) {
+    if (!text) return "";
+    return text
+        .toLowerCase()
+        .replace(/ą/g, "a")
+        .replace(/č/g, "c")
+        .replace(/ę/g, "e")
+        .replace(/ė/g, "e")
+        .replace(/į/g, "i")
+        .replace(/š/g, "s")
+        .replace(/ų/g, "u")
+        .replace(/ū/g, "u")
+        .replace(/ž/g, "z");
+}
+
 function isMemoryCommand(message) { const cleaned = normalize(message.trim()); return memoryTriggers.some(trigger => cleaned.startsWith(trigger + " ") || cleaned.startsWith(trigger + ",") || cleaned === trigger); }
 function extractMemoryContent(message) { const normalizedMessage = normalize(message.trim()); const foundTrigger = memoryTriggers.find(trigger => normalizedMessage.startsWith(trigger)); if (!foundTrigger) return message; const originalWords = message.trim().split(/\s+/); const triggerWords = foundTrigger.split(/\s+/); let startIndex = -1; for (let i = 0; i <= originalWords.length - triggerWords.length; i++) { let match = true; for (let j = 0; j < triggerWords.length; j++) { if (normalize(originalWords[i+j]) !== triggerWords[j]) { match = false; break; } } if (match) { startIndex = i + triggerWords.length; break; } } if (startIndex !== -1) { return originalWords.slice(startIndex).join(" ").trim(); } return message; }
 async function getUserMemory(user_uuid) { if (!user_uuid) return ''; try { const result = await pool.query('SELECT content FROM memories WHERE user_uuid = $1', [user_uuid]); if (result.rows.length > 0) { return result.rows[0].content; } else { await pool.query('INSERT INTO memories (user_uuid, content) VALUES ($1, $2)', [user_uuid, '']); return ''; } } catch (error) { console.error(`Klaida gaunant atmintį vartotojui ${user_uuid}:`, error.message); return ''; } }
@@ -612,5 +615,5 @@ async function deleteConversation(conversationId) { const client = await pool.co
 async function generateAndSaveTitle(conversationId, userMessage, aiMessage) { try { const userPromptPart = userMessage ? `Vartotojas: "${userMessage}"` : 'Vartotojas įkėlė dokumentą analizei.'; const prompt = `Remdamasis šiuo pokalbiu, sugeneruok trumpą, 4-6 žodžių pavadinimą lietuvių kalba. Nenaudok kabučių.\n\n${userPromptPart}\nAsistentas: "${aiMessage.substring(0, 300)}..."\n\nPavadinimas:`; const response = await openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: prompt }], temperature: 0.5, max_tokens: 20, }); let newTitle = response.choices[0].message.content.trim().replace(/"/g, ''); if (newTitle) { await pool.query("UPDATE conversations SET title = $1 WHERE id = $2", [newTitle, conversationId]); console.log(`Sėkmingai atnaujintas pavadinimas pokalbiui ${conversationId}: ${newTitle}`); return newTitle; } } catch (error) { console.error("Klaida generuojant pavadinimą:", error.message); } return null; }
 
 app.listen(port, () => {
-  console.log(`Serveris veikia adresu: http://localhost:${port}`);
+  console.log(`Serveris veikia adresu: http://localhost:${port}`);
 });
